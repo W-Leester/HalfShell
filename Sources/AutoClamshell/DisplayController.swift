@@ -152,24 +152,6 @@ final class DisplayController: ObservableObject {
         manualEnable()
     }
 
-    /// 손쉬운 사용 **권한** 창을 연다.
-    ///
-    /// 열려는 곳은 "시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용"이다.
-    /// 이름이 같은 "시스템 설정 → 손쉬운 사용"(기능 설정)과 헷갈리기 쉬운데 그쪽이
-    /// 아니다. macOS 13 에서 설정 앱이 바뀌며 식별자도 달라져서, 최신 것을 먼저
-    /// 시도하고 실패하면 예전 것으로 되돌아간다.
-    func openAccessibilitySettings() {
-        emergencyUnlock?.requestPermission()
-        let candidates = [
-            "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Accessibility",
-            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
-        ]
-        for candidate in candidates {
-            if let url = URL(string: candidate), NSWorkspace.shared.open(url) { return }
-        }
-        Log.write("[비상] 손쉬운 사용 설정 창을 열지 못했습니다")
-    }
-
     private func applyEmergencyUnlock(requestingPermission: Bool) {
         guard let emergencyUnlock else { return }
         guard emergencyUnlockEnabled else {

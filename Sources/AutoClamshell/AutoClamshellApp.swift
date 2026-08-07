@@ -34,8 +34,7 @@ struct AutoClamshellApp: App {
             Toggle("비상 탈출: Command \(EmergencyUnlock.requiredTaps)번 연타",
                    isOn: $controller.emergencyUnlockEnabled)
             if controller.emergencyUnlockEnabled, !controller.accessibilityTrusted {
-                Text("손쉬운 사용 권한이 필요합니다 (현재 작동 안 함)")
-                Button("손쉬운 사용 설정 열기…") { controller.openAccessibilitySettings() }
+                Text("작동 안 함 — 개인정보 보호 및 보안 → 손쉬운 사용에서 허용 필요")
             }
 
             Divider()
