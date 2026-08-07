@@ -52,10 +52,24 @@ final class DisplayController: ObservableObject {
         didSet { applyLaunchAtLogin() }
     }
 
+    /// Command 연타 비상 탈출 사용 여부.
+    @Published var emergencyUnlockEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(emergencyUnlockEnabled, forKey: Self.emergencyKey)
+            applyEmergencyUnlock(requestingPermission: emergencyUnlockEnabled != oldValue)
+        }
+    }
+    /// 손쉬운 사용 권한 상태. 시스템 설정에서 바뀌므로 워치독이 주기적으로 갱신한다.
+    @Published private(set) var accessibilityTrusted = false
+
     var skyLightAvailable: Bool { SkyLight.shared != nil }
 
     private static let autoModeKey = "autoMode"
+    private static let emergencyKey = "emergencyUnlockEnabled"
+    private static let emergencyPromptedKey = "emergencyPermissionPrompted"
     private static let watchdogInterval: TimeInterval = 2
+
+    private var emergencyUnlock: EmergencyUnlock?
 
     /// 자동 모드가 꺼진 상태에서 사용자가 직접 끈 경우에만 true.
     /// 규칙 2가 곧바로 되돌리는 것을 막는다.
@@ -68,6 +82,9 @@ final class DisplayController: ObservableObject {
     private init() {
         autoMode = UserDefaults.standard.bool(forKey: Self.autoModeKey)
         launchAtLogin = SMAppService.mainApp.status == .enabled
+        // 비상 탈출은 기본값 켜짐. 한 번이라도 화면을 잃으면 메뉴에 접근할 수 없으므로
+        // 사용자가 미리 켜두기를 기대하기보다 기본으로 제공하는 편이 안전하다.
+        emergencyUnlockEnabled = UserDefaults.standard.object(forKey: Self.emergencyKey) as? Bool ?? true
 
         CGDisplayRegisterReconfigurationCallback(displayReconfigured, nil)
 
@@ -89,8 +106,19 @@ final class DisplayController: ObservableObject {
         }
 
         watchdog = Timer.scheduledTimer(withTimeInterval: Self.watchdogInterval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.evaluate() }
+            MainActor.assumeIsolated {
+                self?.evaluate()
+                self?.refreshAccessibilityStatus()
+            }
         }
+
+        emergencyUnlock = EmergencyUnlock { [weak self] in
+            MainActor.assumeIsolated { self?.emergencyRestore() }
+        }
+        // 권한 요청은 최초 1회만 띄운다. 매 실행마다 뜨면 성가시기만 하다.
+        let askedBefore = UserDefaults.standard.bool(forKey: Self.emergencyPromptedKey)
+        applyEmergencyUnlock(requestingPermission: !askedBefore)
+        UserDefaults.standard.set(true, forKey: Self.emergencyPromptedKey)
 
         Log.write("[시작] 자동 모드=\(autoMode) 내장 ID=\(builtinDisplayID.map(String.init) ?? "못 찾음") "
             + "SkyLight=\(skyLightAvailable)")
@@ -113,6 +141,45 @@ final class DisplayController: ObservableObject {
             autoMode = false  // didSet → evaluate() 가 규칙 2로 복구한다
         } else {
             enableBuiltin()
+        }
+    }
+
+    /// Command 연타로 발동하는 비상 복구.
+    ///
+    /// 자동 모드까지 끄는 것이 핵심이다. 켜기만 하면 규칙 3이 곧바로 다시 꺼버려서
+    /// 사용자는 "눌러도 안 된다"고 느끼게 된다.
+    func emergencyRestore() {
+        manualEnable()
+    }
+
+    /// 손쉬운 사용 권한 설정 창을 연다.
+    func openAccessibilitySettings() {
+        emergencyUnlock?.requestPermission()
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        NSWorkspace.shared.open(url)
+    }
+
+    private func applyEmergencyUnlock(requestingPermission: Bool) {
+        guard let emergencyUnlock else { return }
+        guard emergencyUnlockEnabled else {
+            emergencyUnlock.stop()
+            refreshAccessibilityStatus()
+            return
+        }
+        if requestingPermission, !emergencyUnlock.isTrusted {
+            emergencyUnlock.requestPermission()
+        }
+        emergencyUnlock.start()
+        refreshAccessibilityStatus()
+    }
+
+    private func refreshAccessibilityStatus() {
+        guard let emergencyUnlock else { return }
+        let trusted = emergencyUnlock.isTrusted
+        if accessibilityTrusted != trusted { accessibilityTrusted = trusted }
+        // 권한을 나중에 허용했다면 그때 모니터를 붙인다.
+        if emergencyUnlockEnabled, trusted, !emergencyUnlock.isRunning {
+            emergencyUnlock.start()
         }
     }
 

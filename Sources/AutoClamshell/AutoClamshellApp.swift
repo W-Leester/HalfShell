@@ -31,6 +31,15 @@ struct AutoClamshellApp: App {
 
             Divider()
 
+            Toggle("비상 탈출: Command \(EmergencyUnlock.requiredTaps)번 연타",
+                   isOn: $controller.emergencyUnlockEnabled)
+            if controller.emergencyUnlockEnabled, !controller.accessibilityTrusted {
+                Text("손쉬운 사용 권한이 필요합니다 (현재 작동 안 함)")
+                Button("손쉬운 사용 설정 열기…") { controller.openAccessibilitySettings() }
+            }
+
+            Divider()
+
             Toggle("로그인 시 실행", isOn: $controller.launchAtLogin)
             Button("로그 열기") { NSWorkspace.shared.open(Log.fileURL) }
 

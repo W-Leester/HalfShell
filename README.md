@@ -31,6 +31,25 @@ AppKit 화면 변경 알림, 메인 큐 워치독, 그리고 **`SafetyNet`**.
 `ProcessInfo.beginActivity` 로 막는다. 평상시 1초 주기로 돌다가, 재구성이 감지되면
 6초 동안 0.1초 주기로 좁힌다.
 
+### 비상 탈출 (Command 연타)
+
+자동 복구가 어떤 이유로든 실패했을 때 **화면이 보이지 않는 상태에서** 손만으로
+빠져나오는 마지막 수단이다. **Command 키만 2초 안에 5번** 누르면 내장 디스플레이를
+켜고 자동 모드를 끈다. 자동 모드를 함께 끄는 것이 중요하다 — 켜기만 하면 규칙 3이
+곧바로 다시 꺼버려서 "눌러도 안 된다"가 된다.
+
+오발 방지: Command 는 평소 늘 다른 키와 함께 쓰이므로, **사이에 다른 키나 보조키가
+하나라도 끼면 카운트를 버린다.** 그래서 Cmd+C, Cmd+Tab 같은 일상적인 단축키로는
+걸리지 않는다.
+
+전역 키 모니터라 **손쉬운 사용 권한**이 필요하다. 권한이 없으면 조용히 꺼진 채로
+남고 메뉴에 그 사실이 표시된다. 시스템 설정에서 허용하면 앱을 다시 시작하지 않아도
+2초 안에 스스로 붙는다.
+
+> 주의: ad-hoc 서명이라 다시 빌드할 때마다 서명 해시가 바뀐다. 그러면 macOS 가 다른
+> 앱으로 보아 권한이 풀릴 수 있다. 업데이트 후 작동하지 않으면 시스템 설정 →
+> 개인정보 보호 및 보안 → 손쉬운 사용에서 항목을 지우고 다시 추가한다.
+
 ### 로그
 
 `~/Library/Logs/AutoClamshell.log` 에 기록한다. 메뉴바의 **로그 열기**로도 열 수 있다.
@@ -162,6 +181,10 @@ vendor/model 이 숫자가 아니라 ASCII 4글자다 — `0x756E6B6E` = `"unkn"
 ```
 Sources/AutoClamshell/
   SkyLight.swift            # 비공개 API 브리지 (dlsym)
+  Displays.swift            # 디스플레이 조회 + 가상 디스플레이 판별 + 내장 ID 기억
+  SafetyNet.swift           # 메인 런루프 밖에서 도는 최후 방어선
+  EmergencyUnlock.swift     # Command 연타 비상 탈출
+  Log.swift                 # 파일 로거
   DisplayController.swift   # 토폴로지 감시 + 자동 끄기/복구 상태 머신
   AutoClamshellApp.swift    # MenuBarExtra UI + 종료 시 복구
 Resources/Info.plist        # LSUIElement (메뉴바 전용 앱), 버전 정보
