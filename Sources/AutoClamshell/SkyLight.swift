@@ -11,7 +11,7 @@ import Foundation
 ///   3. `SLSCompleteDisplayConfigurationWithOption(config, option)`
 ///
 /// config 객체는 반드시 1번에서 받은 것이어야 하며(공개 API의 config와 다른 타입),
-/// 옵션 0(forAppOnly)으로 커밋하면 이 프로세스가 종료될 때 변경이 자동으로 되돌아간다 —
+/// 커밋 옵션은 ``CommitScope`` 참고. 옵션 0(appOnly)은 프로세스 종료 시 되돌아간다 —
 /// 앱이 죽어도 내장 디스플레이가 꺼진 채 남지 않는 안전장치.
 ///
 /// 심볼은 dlsym으로 런타임에 찾으므로 비공개 프레임워크 링크가 필요 없고,
@@ -36,8 +36,19 @@ struct SkyLight {
     private typealias CompleteFn = @convention(c) (OpaquePointer?, Int32) -> Int32
     private typealias CancelFn = @convention(c) (OpaquePointer?) -> Int32
 
-    /// 프로세스 종료 시 변경이 자동으로 되돌아가는 커밋 옵션.
-    private static let optionAppOnly: Int32 = 0
+    /// 커밋 범위.
+    ///
+    /// 끄기는 `appOnly` 로 커밋한다 — 앱이 죽으면 OS 가 되돌려주길 기대하는 안전장치다.
+    /// 다만 실제 패널이 전부 사라진 뒤에는 이 자동 원복이 동작하지 않는 것을 실측으로
+    /// 확인했으므로 이것만 믿어서는 안 된다 (``SafetyNet`` 이 진짜 방어선이다).
+    ///
+    /// 반대로 켜기는 반드시 `session` 이어야 한다. `appOnly` 로 켜면 이 프로세스가
+    /// 끝나는 순간 도로 꺼진 상태로 되돌아가기 때문이다.
+    enum CommitScope: Int32 {
+        case appOnly = 0
+        case session = 1
+        case permanent = 2
+    }
 
     private let begin: BeginFn
     private let setEnabled: SetEnabledFn
@@ -73,30 +84,18 @@ struct SkyLight {
         self.cancel = resolve(["SLSCancelDisplayConfiguration", "CGSCancelDisplayConfiguration"], as: CancelFn.self)
     }
 
-    func setDisplay(_ displayID: CGDirectDisplayID, enabled: Bool) throws {
-        try setDisplays([displayID], enabled: enabled)
-    }
-
-    /// 여러 디스플레이를 한 트랜잭션으로 처리한다.
-    ///
-    /// 긴급 복구에서 후보 ID를 한꺼번에 켤 때 쓴다. 디스플레이 ID는 재구성 과정에서
-    /// 바뀔 수 있어 어느 하나를 특정하기 어렵기 때문이다. 존재하지 않는 ID가 섞여도
-    /// 해당 항목만 실패하므로, 실패한 ID는 건너뛰고 나머지를 커밋한다.
-    func setDisplays(_ displayIDs: [CGDirectDisplayID], enabled: Bool) throws {
+    func setDisplay(_ displayID: CGDirectDisplayID, enabled: Bool, scope: CommitScope) throws {
         var config: OpaquePointer?
         let beginStatus = begin(&config)
         guard beginStatus == 0, config != nil else { throw Failure.beginFailed(beginStatus) }
 
-        var accepted = 0
-        for id in displayIDs where setEnabled(config, id, enabled) == 0 {
-            accepted += 1
-        }
-        guard accepted > 0 else {
+        let configureStatus = setEnabled(config, displayID, enabled)
+        guard configureStatus == 0 else {
             _ = cancel?(config)
-            throw Failure.configureFailed(-1)
+            throw Failure.configureFailed(configureStatus)
         }
 
-        let commitStatus = complete(config, Self.optionAppOnly)
+        let commitStatus = complete(config, scope.rawValue)
         guard commitStatus == 0 else { throw Failure.commitFailed(commitStatus) }
     }
 }

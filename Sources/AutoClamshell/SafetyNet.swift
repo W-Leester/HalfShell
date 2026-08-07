@@ -72,38 +72,41 @@ final class SafetyNet {
             reschedule(interval: Self.idleInterval)
         }
 
-        let active = DisplayInfo.activeDisplays()
-        let externals = active.filter { CGDisplayIsBuiltin($0) == 0 }
-        let builtinActive = active.contains { CGDisplayIsBuiltin($0) != 0 }
+        let all = DisplayInfo.activeDisplays()
+        let real = all.filter { !DisplayInfo.isVirtual($0) }
 
-        let signature = "active=\(active.sorted()) 외장=\(externals.count) 내장활성=\(builtinActive)"
+        let signature = "active=\(all.sorted()) 실제=\(real.sorted())"
         if signature != lastSignature {
             lastSignature = signature
             Log.write("[안전망] \(signature)")
         }
 
-        // 활성 외장이 있거나 내장이 이미 살아 있으면 할 일이 없다.
-        guard externals.isEmpty, !builtinActive else { return }
+        // 실제 패널이 하나라도 살아 있으면 할 일이 없다.
+        // 여기서 가상 자리표시자를 걸러내는 것이 핵심이다. 그것을 화면으로 세면
+        // "화면이 있으니 괜찮다"고 오판해 정작 복구가 필요한 순간을 놓친다.
+        guard real.isEmpty else { return }
 
-        let candidates = DisplayInfo.builtinCandidates()
-        Log.write("[안전망] 긴급 — 활성 화면 없음. 내장 후보 \(candidates.count)개 일괄 복구 시도")
+        guard let target = BuiltinDisplay.resolve() else {
+            Log.write("[안전망] 긴급 — 실제 화면 없음. 그러나 복구할 내장 ID를 모른다")
+            return
+        }
+        Log.write("[안전망] 긴급 — 실제 화면 없음(active=\(all.sorted())). 내장 id=\(target) 복구 시도")
         guard let skyLight = SkyLight.shared else {
             Log.write("[안전망] 실패: SkyLight 사용 불가")
             return
         }
         do {
-            try skyLight.setDisplays(candidates, enabled: true)
-            Log.write("[안전망] 복구 호출 성공. active=\(DisplayInfo.activeDisplays().sorted())")
+            // session 범위로 커밋한다. appOnly 로 켜면 이 프로세스가 끝날 때 도로 꺼진다.
+            try skyLight.setDisplay(target, enabled: true, scope: .session)
+            Log.write("[안전망] 복구 성공. active=\(DisplayInfo.activeDisplays().sorted())")
         } catch {
-            Log.write("[안전망] 일괄 복구 실패(\(error.localizedDescription)) — 개별 시도")
-            for id in candidates {
-                if (try? skyLight.setDisplay(id, enabled: true)) != nil,
-                   DisplayInfo.activeDisplays().contains(id) {
-                    Log.write("[안전망] id=\(id) 개별 복구 성공")
-                    return
-                }
+            // 컨트롤러 쪽 규칙 1 이 먼저 복구했다면 이쪽 트랜잭션은 밀려서 실패한다.
+            // 화면이 돌아왔는지부터 확인해야 로그가 사실을 말한다.
+            if DisplayInfo.realActiveDisplays().isEmpty {
+                Log.write("[안전망] 복구 실패: \(error.localizedDescription)")
+            } else {
+                Log.write("[안전망] 이미 복구됨(중복 시도). active=\(DisplayInfo.activeDisplays().sorted())")
             }
-            Log.write("[안전망] 개별 복구도 모두 실패. active=\(DisplayInfo.activeDisplays().sorted())")
         }
     }
 }

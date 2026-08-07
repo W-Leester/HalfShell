@@ -62,20 +62,8 @@ final class DisplayController: ObservableObject {
     private var manuallyDisabled = false
     private var pendingEvaluation: DispatchWorkItem?
     private var watchdog: Timer?
-    private var lastKnownBuiltinID: CGDirectDisplayID?
-
-    /// 내장 디스플레이 ID.
-    ///
-    /// 재구성 과정에서 ID 가 바뀌고 일시적으로 조회되지 않는 순간이 있어서(실측 확인)
-    /// 영구 캐시는 위험하다. 매번 새로 찾되, 못 찾은 순간에는 마지막으로 확인된 값을
-    /// 쓴다.
-    private var builtinDisplayID: CGDirectDisplayID? {
-        if let found = DisplayInfo.findBuiltinDisplay() {
-            lastKnownBuiltinID = found
-            return found
-        }
-        return lastKnownBuiltinID
-    }
+    /// 내장 디스플레이 ID. 꺼진 뒤에는 조회되지 않으므로 ``BuiltinDisplay`` 가 기억한다.
+    private var builtinDisplayID: CGDirectDisplayID? { BuiltinDisplay.resolve() }
 
     private init() {
         autoMode = UserDefaults.standard.bool(forKey: Self.autoModeKey)
@@ -150,7 +138,9 @@ final class DisplayController: ObservableObject {
     }
 
     private func evaluate() {
-        let active = Set(DisplayInfo.activeDisplays())
+        // 가상 자리표시자는 화면으로 세지 않는다. 그것을 외장으로 오인하면
+        // "외장이 있으니 내장은 꺼둬도 된다"고 판단해 복구를 놓친다.
+        let active = Set(DisplayInfo.realActiveDisplays())
         let externals = active.filter { CGDisplayIsBuiltin($0) == 0 }
         // 워치독이 2초마다 도므로, 값이 실제로 바뀔 때만 발행해 UI 갱신을 아낀다.
         if externalConnected != !externals.isEmpty { externalConnected = !externals.isEmpty }
@@ -163,16 +153,10 @@ final class DisplayController: ObservableObject {
         if builtinOff != isOff { builtinOff = isOff }
 
         if externals.isEmpty {
-            // 규칙 1: 외장이 없으면 무조건 켠다. ID 가 흔들릴 수 있으므로 후보를 모두 켠다.
+            // 규칙 1: 외장이 없으면 무조건 켠다.
             if isOff {
                 Log.write("[규칙1] 외장 0개 + 내장 꺼짐 → 복구")
-                if let skyLight = SkyLight.shared,
-                   (try? skyLight.setDisplays(DisplayInfo.builtinCandidates(), enabled: true)) != nil {
-                    builtinOff = false
-                    Log.write("[규칙1] 복구 완료. active=\(DisplayInfo.activeDisplays().sorted())")
-                } else {
-                    enableBuiltin()
-                }
+                enableBuiltin()
             }
         } else if autoMode {
             // 규칙 3
@@ -189,7 +173,8 @@ final class DisplayController: ObservableObject {
     private func disableBuiltin() {
         guard let skyLight = SkyLight.shared, let id = builtinDisplayID else { return }
         do {
-            try skyLight.setDisplay(id, enabled: false)
+            // appOnly: 앱이 죽으면 OS 가 되돌려주길 기대하는 방향으로 커밋한다.
+            try skyLight.setDisplay(id, enabled: false, scope: .appOnly)
             builtinOff = true
             lastError = nil
             Log.write("[동작] 내장(id=\(id)) 끔")
@@ -202,7 +187,8 @@ final class DisplayController: ObservableObject {
     private func enableBuiltin() {
         guard let skyLight = SkyLight.shared, let id = builtinDisplayID else { return }
         do {
-            try skyLight.setDisplay(id, enabled: true)
+            // session: appOnly 로 켜면 이 프로세스가 끝날 때 도로 꺼진다.
+            try skyLight.setDisplay(id, enabled: true, scope: .session)
             builtinOff = false
             lastError = nil
             Log.write("[동작] 내장(id=\(id)) 켬. active=\(DisplayInfo.activeDisplays().sorted())")

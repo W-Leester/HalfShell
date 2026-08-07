@@ -111,6 +111,28 @@ SLSCompleteDisplayConfigurationWithOption(config, 0 /* forAppOnly */)
 - 심볼은 `dlsym`으로 런타임에 찾는다. OS 업데이트로 비공개 심볼이 사라지면 기능이
   비활성화될 뿐 크래시하지 않는다.
 
+### 가상 디스플레이 함정
+
+실제 패널이 하나도 활성 상태가 아니게 되면 **macOS 가 가상 디스플레이를 하나
+만들어낸다.** 실측값은 이렇다.
+
+```
+id=11 builtin=false active=true online=true
+vendor=1970170734 model=1986622068  1920x1080
+```
+
+vendor/model 이 숫자가 아니라 ASCII 4글자다 — `0x756E6B6E` = `"unkn"`,
+`0x76697274` = `"virt"`. 그리고 `CGDisplayIsBuiltin` 이 **false** 다.
+
+그래서 그냥 두면 외장 디스플레이로 오인된다. "외장이 있으니 내장은 꺼둬도 된다"고
+판단해 버리므로, 정작 화면이 하나도 안 나오는 상황에서 복구가 영영 일어나지 않는다.
+실제로 외장 케이블을 뽑았을 때 화면이 검은 채로 남던 원인이 이것이었다.
+그래서 모든 판단은 가상 디스플레이를 걸러낸 `realActiveDisplays()` 로 한다.
+
+또 하나 확인된 사실: 이 상태에서는 `appOnly` 커밋의 **자동 원복도 동작하지 않는다.**
+앱을 강제 종료해도 내장이 돌아오지 않았다. 그래서 켜기는 `session` 범위로 커밋하고,
+자동 원복에 기대지 않는다.
+
 ### 꺼진 내장 디스플레이를 다시 찾는 법
 
 논리적으로 끈 디스플레이는 `CGGetActiveDisplayList` 는 물론 **`CGGetOnlineDisplayList`
