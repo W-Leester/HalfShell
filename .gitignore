@@ -1,0 +1,11 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# 빌드 산출물
+build/
+dist/
+
+# macOS
+.DS_Store
