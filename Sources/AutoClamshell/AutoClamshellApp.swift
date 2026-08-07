@@ -32,6 +32,7 @@ struct AutoClamshellApp: App {
             Divider()
 
             Toggle("로그인 시 실행", isOn: $controller.launchAtLogin)
+            Button("로그 열기") { NSWorkspace.shared.open(Log.fileURL) }
 
             Divider()
 
@@ -49,11 +50,27 @@ struct AutoClamshellApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// App Nap 방지 토큰. 해제되면 다시 App Nap 대상이 되므로 앱 수명 내내 잡고 있는다.
+    private var activityToken: NSObjectProtocol?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+
+        // 화면이 0개가 되면 이 앱은 창도 입력도 없는 완전한 백그라운드 프로세스가 되어
+        // App Nap 대상이 된다. 그러면 타이머가 수십 초씩 밀려서, 정작 복구가 가장
+        // 급한 순간에 감시가 돌지 않는다. 유휴 시스템 잠자기는 그대로 허용한다.
+        activityToken = ProcessInfo.processInfo.beginActivity(
+            options: [.userInitiatedAllowingIdleSystemSleep],
+            reason: "디스플레이 상태 감시"
+        )
+
+        Log.startSession("AutoClamshell \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "?")")
+        SafetyNet.shared.start()
+        _ = DisplayController.shared
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        SafetyNet.shared.stop()
         MainActor.assumeIsolated { DisplayController.shared.restoreForQuit() }
     }
 }

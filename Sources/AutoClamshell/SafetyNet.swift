@@ -1,0 +1,109 @@
+import CoreGraphics
+import Foundation
+
+/// 최후의 방어선. 메인 런루프와 **완전히 무관하게** 도는 감시 타이머다.
+///
+/// 화면이 하나도 없는 상태가 되면 이 앱은 창도 없고 사용자 입력도 없는 완전한
+/// 백그라운드 프로세스가 된다. 이때 App Nap 이 메인 런루프의 `Timer` 를 수십 초씩
+/// 지연시킬 수 있어서, 정작 복구가 가장 급한 순간에 워치독이 돌지 않는다.
+/// 그래서 이쪽은 전용 `DispatchQueue` 위의 `DispatchSourceTimer` 를 쓰고,
+/// 판단과 복구를 그 큐에서 직접 끝낸다 (MainActor 로 넘기지 않는다).
+///
+/// 정책은 신경 쓰지 않는다. 오직 한 가지 조건만 본다:
+/// **활성 외장이 하나도 없는데 내장도 꺼져 있다 → 무조건 켠다.**
+final class SafetyNet {
+    static let shared = SafetyNet()
+
+    /// 평상시 주기. 디스플레이 구성이 안정된 동안에는 이 간격으로 확인한다.
+    private static let idleInterval: TimeInterval = 1
+    /// 경계 주기. 재구성이 시작되면 이 간격으로 좁혀서 빠르게 복구한다.
+    private static let alertInterval: TimeInterval = 0.1
+    /// 경계 상태를 유지하는 시간.
+    private static let alertDuration: TimeInterval = 6
+
+    private let queue = DispatchQueue(label: "dev.leester.autoclamshell.safetynet", qos: .userInitiated)
+    private var timer: DispatchSourceTimer?
+    private var alerting = false
+    private var alertDeadline = Date.distantPast
+    private var lastSignature = ""
+
+    private init() {}
+
+    func start() {
+        queue.async { [self] in
+            guard timer == nil else { return }
+            let source = DispatchSource.makeTimerSource(queue: queue)
+            source.setEventHandler { [weak self] in self?.tick() }
+            timer = source
+            reschedule(interval: Self.idleInterval)
+            source.resume()
+            Log.write("[안전망] 시작 (평상시 \(Self.idleInterval)초 / 경계 \(Self.alertInterval)초)")
+        }
+    }
+
+    func stop() {
+        queue.async { [self] in
+            timer?.cancel()
+            timer = nil
+        }
+    }
+
+    /// 디스플레이 재구성이 감지되면 호출한다. 잠시 확인 주기를 좁힌다.
+    ///
+    /// 재구성이 **끝난 뒤에야** 외장이 사라진 것을 알 수 있는데, 그 순간 화면이
+    /// 하나도 없으면 사용자는 아무것도 할 수 없다. 평상시 주기(1초)를 기다리는 대신
+    /// 0.1초 간격으로 좁혀서 체감 정지 시간을 줄인다.
+    func alert() {
+        queue.async { [self] in
+            alertDeadline = Date().addingTimeInterval(Self.alertDuration)
+            guard !alerting else { return }
+            alerting = true
+            reschedule(interval: Self.alertInterval)
+        }
+    }
+
+    private func reschedule(interval: TimeInterval) {
+        timer?.schedule(deadline: .now() + interval, repeating: interval, leeway: .milliseconds(10))
+    }
+
+    private func tick() {
+        if alerting, Date() > alertDeadline {
+            alerting = false
+            reschedule(interval: Self.idleInterval)
+        }
+
+        let active = DisplayInfo.activeDisplays()
+        let externals = active.filter { CGDisplayIsBuiltin($0) == 0 }
+        let builtinActive = active.contains { CGDisplayIsBuiltin($0) != 0 }
+
+        let signature = "active=\(active.sorted()) 외장=\(externals.count) 내장활성=\(builtinActive)"
+        if signature != lastSignature {
+            lastSignature = signature
+            Log.write("[안전망] \(signature)")
+        }
+
+        // 활성 외장이 있거나 내장이 이미 살아 있으면 할 일이 없다.
+        guard externals.isEmpty, !builtinActive else { return }
+
+        let candidates = DisplayInfo.builtinCandidates()
+        Log.write("[안전망] 긴급 — 활성 화면 없음. 내장 후보 \(candidates.count)개 일괄 복구 시도")
+        guard let skyLight = SkyLight.shared else {
+            Log.write("[안전망] 실패: SkyLight 사용 불가")
+            return
+        }
+        do {
+            try skyLight.setDisplays(candidates, enabled: true)
+            Log.write("[안전망] 복구 호출 성공. active=\(DisplayInfo.activeDisplays().sorted())")
+        } catch {
+            Log.write("[안전망] 일괄 복구 실패(\(error.localizedDescription)) — 개별 시도")
+            for id in candidates {
+                if (try? skyLight.setDisplay(id, enabled: true)) != nil,
+                   DisplayInfo.activeDisplays().contains(id) {
+                    Log.write("[안전망] id=\(id) 개별 복구 성공")
+                    return
+                }
+            }
+            Log.write("[안전망] 개별 복구도 모두 실패. active=\(DisplayInfo.activeDisplays().sorted())")
+        }
+    }
+}

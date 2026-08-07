@@ -74,14 +74,26 @@ struct SkyLight {
     }
 
     func setDisplay(_ displayID: CGDirectDisplayID, enabled: Bool) throws {
+        try setDisplays([displayID], enabled: enabled)
+    }
+
+    /// 여러 디스플레이를 한 트랜잭션으로 처리한다.
+    ///
+    /// 긴급 복구에서 후보 ID를 한꺼번에 켤 때 쓴다. 디스플레이 ID는 재구성 과정에서
+    /// 바뀔 수 있어 어느 하나를 특정하기 어렵기 때문이다. 존재하지 않는 ID가 섞여도
+    /// 해당 항목만 실패하므로, 실패한 ID는 건너뛰고 나머지를 커밋한다.
+    func setDisplays(_ displayIDs: [CGDirectDisplayID], enabled: Bool) throws {
         var config: OpaquePointer?
         let beginStatus = begin(&config)
         guard beginStatus == 0, config != nil else { throw Failure.beginFailed(beginStatus) }
 
-        let configureStatus = setEnabled(config, displayID, enabled)
-        guard configureStatus == 0 else {
+        var accepted = 0
+        for id in displayIDs where setEnabled(config, id, enabled) == 0 {
+            accepted += 1
+        }
+        guard accepted > 0 else {
             _ = cancel?(config)
-            throw Failure.configureFailed(configureStatus)
+            throw Failure.configureFailed(-1)
         }
 
         let commitStatus = complete(config, Self.optionAppOnly)

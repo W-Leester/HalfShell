@@ -21,9 +21,21 @@
    이전 인스턴스가 크래시했거나 다른 앱(Lunar 등)이 꺼둔 상태를 자가 치유한다.
 3. 자동 모드 + 외장 존재 → 내장을 끈다.
 
-감시 경로를 세 겹으로 둔다. `CGDisplayRegisterReconfigurationCallback`(가장 빠름),
-AppKit 화면 변경 알림, 그리고 **2초 주기 워치독**. 앞의 두 알림이 오지 않는
-상황에서도 워치독이 늦어도 2초 안에 복구한다.
+감시 경로를 여러 겹으로 둔다. `CGDisplayRegisterReconfigurationCallback`(가장 빠름),
+AppKit 화면 변경 알림, 메인 큐 워치독, 그리고 **`SafetyNet`**.
+
+`SafetyNet` 이 규칙 1 전용 최후 방어선이다. 화면이 0개가 되면 이 앱은 창도 입력도
+없는 완전한 백그라운드 프로세스가 되어 **App Nap 이 메인 런루프 타이머를 수십 초씩
+지연**시킬 수 있다. 그래서 `SafetyNet` 은 전용 큐의 `DispatchSourceTimer` 를 쓰고
+판단과 복구를 그 큐에서 끝낸다(MainActor 를 거치지 않는다). App Nap 자체도
+`ProcessInfo.beginActivity` 로 막는다. 평상시 1초 주기로 돌다가, 재구성이 감지되면
+6초 동안 0.1초 주기로 좁힌다.
+
+### 로그
+
+`~/Library/Logs/AutoClamshell.log` 에 기록한다. 메뉴바의 **로그 열기**로도 열 수 있다.
+화면이 하나도 없는 순간에 무슨 일이 있었는지는 사후에 로그로만 확인할 수 있어서,
+디스플레이 재구성 이벤트와 복구 시도를 모두 남긴다.
 
 ## 설치
 
