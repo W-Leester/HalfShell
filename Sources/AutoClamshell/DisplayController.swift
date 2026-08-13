@@ -67,7 +67,8 @@ final class DisplayController: ObservableObject {
     private static let autoModeKey = "autoMode"
     private static let emergencyKey = "emergencyUnlockEnabled"
     private static let emergencyPromptedKey = "emergencyPermissionPrompted"
-    private static let watchdogInterval: TimeInterval = 2
+    /// 재구성 콜백이 실제 감지를 담당하므로 이 폴링은 예비 수단이다. 넉넉하게 둔다.
+    private static let watchdogInterval: TimeInterval = 5
 
     private var emergencyUnlock: EmergencyUnlock?
 
@@ -111,6 +112,8 @@ final class DisplayController: ObservableObject {
                 self?.refreshAccessibilityStatus()
             }
         }
+        // 여유를 크게 줘서 커널이 다른 깨우기와 묶을 수 있게 한다(전력 절약).
+        watchdog?.tolerance = Self.watchdogInterval / 2
 
         emergencyUnlock = EmergencyUnlock { [weak self] in
             MainActor.assumeIsolated { self?.emergencyRestore() }
@@ -198,6 +201,11 @@ final class DisplayController: ObservableObject {
     }
 
     private func evaluate() {
+        // 활성 목록이 완전히 비어 있으면 잠자기 중이다. 이때 손대면 잠든 맥을 상대로
+        // 복구를 반복하게 된다(커밋이 10초씩 블로킹되므로 전력 손실이 크다).
+        // 진짜 위험 상황에서는 macOS 가 가상 디스플레이를 만들어 목록이 비지 않는다.
+        guard !DisplayInfo.activeDisplays().isEmpty else { return }
+
         // 가상 자리표시자는 화면으로 세지 않는다. 그것을 외장으로 오인하면
         // "외장이 있으니 내장은 꺼둬도 된다"고 판단해 복구를 놓친다.
         let active = Set(DisplayInfo.realActiveDisplays())

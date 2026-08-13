@@ -15,7 +15,13 @@ final class SafetyNet {
     static let shared = SafetyNet()
 
     /// 평상시 주기. 디스플레이 구성이 안정된 동안에는 이 간격으로 확인한다.
-    private static let idleInterval: TimeInterval = 1
+    ///
+    /// 실제 복구는 재구성 콜백이 켜는 경계 모드가 담당하므로 이 폴링은 알림이
+    /// 아예 오지 않는 경우를 대비한 예비 수단이다. 짧게 잡을 이유가 없고,
+    /// 배터리로 도는 시간이 대부분이라 넉넉하게 둔다.
+    private static let idleInterval: TimeInterval = 5
+    /// 평상시 여유. 크게 줘야 커널이 다른 깨우기와 묶어서 처리한다(전력 절약).
+    private static let idleLeeway: DispatchTimeInterval = .seconds(2)
     /// 경계 주기. 재구성이 시작되면 이 간격으로 좁혀서 빠르게 복구한다.
     private static let alertInterval: TimeInterval = 0.1
     /// 경계 상태를 유지하는 시간.
@@ -26,6 +32,11 @@ final class SafetyNet {
     private var alerting = false
     private var alertDeadline = Date.distantPast
     private var lastSignature = ""
+    private var consecutiveFailures = 0
+    private var retryNotBefore = Date.distantPast
+
+    /// 연속 실패 시 재시도 간격 상한.
+    private static let maxBackoff: Double = 60
 
     private init() {}
 
@@ -63,7 +74,11 @@ final class SafetyNet {
     }
 
     private func reschedule(interval: TimeInterval) {
-        timer?.schedule(deadline: .now() + interval, repeating: interval, leeway: .milliseconds(10))
+        // 경계 모드는 즉시성이 생명이라 여유를 최소로, 평상시에는 크게 준다.
+        let leeway: DispatchTimeInterval = interval <= Self.alertInterval
+            ? .milliseconds(10)
+            : Self.idleLeeway
+        timer?.schedule(deadline: .now() + interval, repeating: interval, leeway: leeway)
     }
 
     private func tick() {
@@ -81,10 +96,28 @@ final class SafetyNet {
             Log.write("[안전망] \(signature)")
         }
 
+        // 활성 목록이 **완전히** 비어 있으면 잠자기 중이다. 복구할 것도 이유도 없다.
+        //
+        // 진짜 위험 상황과 구분하는 기준이 바로 이것이다. 실제 패널이 모두 사라지면
+        // macOS 가 가상 디스플레이를 만들어 두므로 목록이 비지 않는다(active=[12] 같은 꼴).
+        // 반대로 잠자기 중에는 목록이 통째로 빈다. 이 구분을 놓쳐서 밤새 잠든 맥을
+        // 상대로 복구를 반복하며 배터리를 태운 적이 있다.
+        guard !all.isEmpty else {
+            clearFailureState()
+            return
+        }
+
         // 실제 패널이 하나라도 살아 있으면 할 일이 없다.
         // 여기서 가상 자리표시자를 걸러내는 것이 핵심이다. 그것을 화면으로 세면
         // "화면이 있으니 괜찮다"고 오판해 정작 복구가 필요한 순간을 놓친다.
-        guard real.isEmpty else { return }
+        guard real.isEmpty else {
+            clearFailureState()
+            return
+        }
+
+        // 연속 실패 시 물러선다. 복구가 안 되는 상황에서 무한 재시도하면
+        // 전력만 태운다(커밋 호출이 실패할 때 10초씩 블로킹된다).
+        guard Date() >= retryNotBefore else { return }
 
         guard let target = BuiltinDisplay.resolve() else {
             Log.write("[안전망] 긴급 — 실제 화면 없음. 그러나 복구할 내장 ID를 모른다")
@@ -99,14 +132,26 @@ final class SafetyNet {
             // session 범위로 커밋한다. appOnly 로 켜면 이 프로세스가 끝날 때 도로 꺼진다.
             try skyLight.setDisplay(target, enabled: true, scope: .session)
             Log.write("[안전망] 복구 성공. active=\(DisplayInfo.activeDisplays().sorted())")
+            clearFailureState()
         } catch {
             // 컨트롤러 쪽 규칙 1 이 먼저 복구했다면 이쪽 트랜잭션은 밀려서 실패한다.
             // 화면이 돌아왔는지부터 확인해야 로그가 사실을 말한다.
-            if DisplayInfo.realActiveDisplays().isEmpty {
-                Log.write("[안전망] 복구 실패: \(error.localizedDescription)")
-            } else {
+            if !DisplayInfo.realActiveDisplays().isEmpty {
                 Log.write("[안전망] 이미 복구됨(중복 시도). active=\(DisplayInfo.activeDisplays().sorted())")
+                clearFailureState()
+                return
             }
+            consecutiveFailures += 1
+            let backoff = min(pow(2, Double(consecutiveFailures)), Self.maxBackoff)
+            retryNotBefore = Date().addingTimeInterval(backoff)
+            Log.write("[안전망] 복구 실패(\(consecutiveFailures)회): \(error.localizedDescription) "
+                + "— \(Int(backoff))초 뒤 재시도")
         }
+    }
+
+    private func clearFailureState() {
+        guard consecutiveFailures > 0 else { return }
+        consecutiveFailures = 0
+        retryNotBefore = .distantPast
     }
 }
