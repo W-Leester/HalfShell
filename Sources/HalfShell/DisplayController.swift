@@ -143,14 +143,17 @@ final class DisplayController: ObservableObject {
         disableBuiltin()
     }
 
+    /// 수동/비상 켜기.
+    ///
+    /// **상태 판단에 기대지 않고 직접 켠다.** 이 경로는 화면이 보이지 않는 상황의
+    /// 마지막 수단이므로, `evaluate()` 의 판단(활성 목록이 비면 잠자기로 보고 손을
+    /// 떼는 등)이 어떤 이유로든 막히면 탈출까지 함께 막혀 버린다.
+    /// 자동 모드도 함께 끈다. 켜기만 하면 규칙 3이 곧바로 다시 꺼버리기 때문이다.
     func manualEnable() {
         manuallyDisabled = false
         Log.write("[조작] 수동 켜기")
-        if autoMode {
-            autoMode = false  // didSet → evaluate() 가 규칙 2로 복구한다
-        } else {
-            enableBuiltin()
-        }
+        autoMode = false
+        enableBuiltin()
     }
 
     /// Command 연타로 발동하는 비상 복구.
