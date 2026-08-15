@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 @main
-struct AutoClamshellApp: App {
+struct HalfShellApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var controller = DisplayController.shared
 
@@ -72,7 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             reason: "디스플레이 상태 감시"
         )
 
-        Log.startSession("AutoClamshell \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "?")")
+        Log.startSession("HalfShell \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "?")")
         SafetyNet.shared.start()
         _ = DisplayController.shared
     }

@@ -3,20 +3,20 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-SRC=build/AutoClamshell.app
-DEST=/Applications/AutoClamshell.app
+SRC=build/HalfShell.app
+DEST=/Applications/HalfShell.app
 
 if [[ ! -d "$SRC" ]]; then
   echo "먼저 ./build.sh 를 실행하세요." >&2
   exit 1
 fi
 
-if pgrep -x AutoClamshell >/dev/null; then
-  echo "실행 중인 AutoClamshell 종료 중... (내장 디스플레이가 복구됩니다)"
-  osascript -e 'quit app "AutoClamshell"' 2>/dev/null || pkill -x AutoClamshell || true
+if pgrep -x HalfShell >/dev/null; then
+  echo "실행 중인 HalfShell 종료 중... (내장 디스플레이가 복구됩니다)"
+  osascript -e 'quit app "HalfShell"' 2>/dev/null || pkill -x HalfShell || true
   # 종료 시 디스플레이 복구가 끝날 때까지 잠시 대기
   for _ in {1..20}; do
-    pgrep -x AutoClamshell >/dev/null || break
+    pgrep -x HalfShell >/dev/null || break
     sleep 0.25
   done
 fi

@@ -195,14 +195,14 @@ ID 도 그 플래그가 true 라는 것을 **이미 알고 있었으면서** 넣
 
 ## 재발 시 진단 순서
 
-**1. 앱 로그부터 본다.** `~/Library/Logs/AutoClamshell.log` (메뉴바 → 로그 열기)
+**1. 앱 로그부터 본다.** `~/Library/Logs/HalfShell.log` (메뉴바 → 로그 열기)
 
 ```sh
 # 폭주 여부 — 시간대별 활동 횟수. 특정 시간대에 수백 회면 루프다
-grep -E "\[동작\]|\[규칙1\]" ~/Library/Logs/AutoClamshell.log | cut -c1-8 | uniq -c | awk '$1>=10'
+grep -E "\[동작\]|\[규칙1\]" ~/Library/Logs/HalfShell.log | cut -c1-8 | uniq -c | awk '$1>=10'
 
 # 무엇을 보고 판단했는지
-grep "안전망" ~/Library/Logs/AutoClamshell.log | tail -30
+grep "안전망" ~/Library/Logs/HalfShell.log | tail -30
 ```
 
 `active=[]` 는 잠자기, `active=[숫자]` 인데 `실제=[]` 면 진짜 비상이다.
@@ -217,7 +217,7 @@ pmset -g assertions          # 무엇이 잠자기를 막고 있는지
 **3. 앱의 CPU 를 잰다.** 유휴 상태에서 240초에 0.02초 수준이면 정상이다.
 
 ```sh
-ps -o time=,etime= -p $(pgrep -x AutoClamshell)
+ps -o time=,etime= -p $(pgrep -x HalfShell)
 top -l 2 -o power -n 12 -stats pid,command,cpu,power   # 상위 목록에 없어야 정상
 ```
 
@@ -237,7 +237,7 @@ for id in ids.prefix(Int(c)) {
 **5. 화면에 갇혔다면.** 외장을 다시 꽂으면 즉시 돌아온다. 그다음:
 
 ```sh
-pkill -x AutoClamshell     # 그래도 안 되면 아래 수동 복구
+pkill -x HalfShell     # 그래도 안 되면 아래 수동 복구
 ```
 
 수동 복구(`session` 범위 커밋이라 프로세스가 끝나도 유지된다):

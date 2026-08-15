@@ -1,9 +1,9 @@
 #!/bin/zsh
-# AutoClamshell.app 번들을 빌드한다. 결과물: build/AutoClamshell.app
+# HalfShell.app 번들을 빌드한다. 결과물: build/HalfShell.app
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP=build/AutoClamshell.app
+APP=build/HalfShell.app
 ICNS=build/AppIcon.icns
 
 swift build -c release
@@ -30,7 +30,7 @@ fi
 # --- 앱 번들 조립 ---
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp .build/release/AutoClamshell "$APP/Contents/MacOS/"
+cp .build/release/HalfShell "$APP/Contents/MacOS/"
 cp Resources/Info.plist "$APP/Contents/"
 cp "$ICNS" "$APP/Contents/Resources/"
 

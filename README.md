@@ -1,7 +1,12 @@
-# AutoClamshell
+# HalfShell
 
 뚜껑을 **연 채로** 내장 디스플레이만 끄고 외장 디스플레이를 단독 사용하게 해주는 macOS 메뉴바 앱.
 클램쉘 모드의 화면 구성은 그대로 가져오면서, 뚜껑을 닫아서 생기는 발열 문제를 피한다.
+
+> **이름에 대하여.** 클램쉘(clamshell)은 조개껍데기, 즉 **뚜껑을 닫은** 상태를 가리킨다.
+> 이 앱이 만드는 것은 화면 구성만 같을 뿐 물리적으로는 정반대다 — 오히려 뚜껑을 닫지
+> **않는 것**이 존재 이유다(닫으면 방열이 나빠진다). 그래서 "반만 열린 조개"라는 뜻의
+> HalfShell 로 부른다. 클램쉘 계열임을 알리면서 닫지 않았다는 차이를 담기 위해서다.
 
 ## 기능
 
@@ -28,7 +33,7 @@ AppKit 화면 변경 알림, 메인 큐 워치독, 그리고 **`SafetyNet`**.
 없는 완전한 백그라운드 프로세스가 되어 **App Nap 이 메인 런루프 타이머를 수십 초씩
 지연**시킬 수 있다. 그래서 `SafetyNet` 은 전용 큐의 `DispatchSourceTimer` 를 쓰고
 판단과 복구를 그 큐에서 끝낸다(MainActor 를 거치지 않는다). App Nap 자체도
-`ProcessInfo.beginActivity` 로 막는다. 평상시 1초 주기로 돌다가, 재구성이 감지되면
+`ProcessInfo.beginActivity` 로 막는다. 평상시 5초 주기로 돌다가, 재구성이 감지되면
 6초 동안 0.1초 주기로 좁힌다.
 
 ### 비상 탈출 (Command 연타)
@@ -57,17 +62,17 @@ macOS 가 기본적으로 막아두기 때문이다. 권한이 없으면 조용�
 
 ### 로그
 
-`~/Library/Logs/AutoClamshell.log` 에 기록한다. 메뉴바의 **로그 열기**로도 열 수 있다.
+`~/Library/Logs/HalfShell.log` 에 기록한다. 메뉴바의 **로그 열기**로도 열 수 있다.
 화면이 하나도 없는 순간에 무슨 일이 있었는지는 사후에 로그로만 확인할 수 있어서,
 디스플레이 재구성 이벤트와 복구 시도를 모두 남긴다.
 
 ## 설치
 
-DMG를 받았다면 열어서 `AutoClamshell.app`을 **응용 프로그램** 폴더로 드래그한 뒤,
+DMG를 받았다면 열어서 `HalfShell.app`을 **응용 프로그램** 폴더로 드래그한 뒤,
 터미널에서 격리 속성을 한 번 풀어준다 (아래 [Gatekeeper](#gatekeeper) 참고):
 
 ```sh
-xattr -cr /Applications/AutoClamshell.app
+xattr -cr /Applications/HalfShell.app
 ```
 
 실행해도 창은 뜨지 않는다. 메뉴바 오른쪽에 노트북 아이콘이 생기고, 거기서
@@ -78,7 +83,7 @@ xattr -cr /Applications/AutoClamshell.app
 Xcode는 필요 없다. Command Line Tools의 Swift 툴체인만 있으면 빌드된다.
 
 ```sh
-./build.sh      # build/AutoClamshell.app 생성 (아이콘 포함)
+./build.sh      # build/HalfShell.app 생성 (아이콘 포함)
 ./install.sh    # 빌드한 앱을 /Applications 로 설치하고 실행
 ./make-dmg.sh   # 배포용 DMG 생성
 ```
@@ -90,7 +95,7 @@ Xcode는 필요 없다. Command Line Tools의 Swift 툴체인만 있으면 빌�
 
 ### 배포용 DMG
 
-`./make-dmg.sh`는 `dist/AutoClamshell-<버전>.dmg`를 만든다. 버전은
+`./make-dmg.sh`는 `dist/HalfShell-<버전>.dmg`를 만든다. 버전은
 `Resources/Info.plist`의 `CFBundleShortVersionString`에서 읽으므로, 버전을 올리려면
 그 값만 수정하면 된다. 앱이 빌드되어 있지 않으면 `build.sh`를 먼저 호출한다.
 
@@ -98,7 +103,7 @@ DMG를 열면 세 가지가 보인다:
 
 | 항목 | 용도 |
 | --- | --- |
-| `AutoClamshell.app` | 드래그할 앱 |
+| `HalfShell.app` | 드래그할 앱 |
 | `응용 프로그램` | `/Applications` 심볼릭 링크 (드래그 대상) |
 | `먼저 읽어주세요.txt` | 설치 방법과 Gatekeeper 해제 안내 |
 
@@ -208,14 +213,14 @@ vendor/model 이 숫자가 아니라 ASCII 4글자다 — `0x756E6B6E` = `"unkn"
 ## 프로젝트 구조
 
 ```
-Sources/AutoClamshell/
+Sources/HalfShell/
   SkyLight.swift            # 비공개 API 브리지 (dlsym)
   Displays.swift            # 디스플레이 조회 + 가상 디스플레이 판별 + 내장 ID 기억
   SafetyNet.swift           # 메인 런루프 밖에서 도는 최후 방어선
   EmergencyUnlock.swift     # Command 연타 비상 탈출
   Log.swift                 # 파일 로거
   DisplayController.swift   # 토폴로지 감시 + 자동 끄기/복구 상태 머신
-  AutoClamshellApp.swift    # MenuBarExtra UI + 종료 시 복구
+  HalfShellApp.swift        # MenuBarExtra UI + 종료 시 복구
 Resources/Info.plist        # LSUIElement (메뉴바 전용 앱), 버전 정보
 scripts/make-icon.swift     # 앱 아이콘(.icns) 생성기
 build.sh                    # .app 번들 빌드 + 아이콘 + ad-hoc 서명

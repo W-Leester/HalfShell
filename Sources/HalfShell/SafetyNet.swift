@@ -27,7 +27,7 @@ final class SafetyNet {
     /// 경계 상태를 유지하는 시간.
     private static let alertDuration: TimeInterval = 6
 
-    private let queue = DispatchQueue(label: "dev.leester.autoclamshell.safetynet", qos: .userInitiated)
+    private let queue = DispatchQueue(label: "dev.leester.halfshell.safetynet", qos: .userInitiated)
     private var timer: DispatchSourceTimer?
     private var alerting = false
     private var alertDeadline = Date.distantPast

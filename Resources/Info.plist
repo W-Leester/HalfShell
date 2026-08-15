@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>AutoClamshell</string>
+	<string>HalfShell</string>
 	<key>CFBundleDisplayName</key>
-	<string>AutoClamshell</string>
+	<string>HalfShell</string>
 	<key>CFBundleIdentifier</key>
-	<string>dev.leester.autoclamshell</string>
+	<string>dev.leester.halfshell</string>
 	<key>CFBundleExecutable</key>
-	<string>AutoClamshell</string>
+	<string>HalfShell</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundlePackageType</key>

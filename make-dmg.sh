@@ -1,28 +1,28 @@
 #!/bin/zsh
-# 배포용 DMG 인스톤러를 만든다. 결과물: dist/AutoClamshell-<버전>.dmg
+# 배포용 DMG 인스톤러를 만든다. 결과물: dist/HalfShell-<버전>.dmg
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP=build/AutoClamshell.app
+APP=build/HalfShell.app
 [[ -d "$APP" ]] || ./build.sh
 
 VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist")
-DMG="dist/AutoClamshell-$VERSION.dmg"
+DMG="dist/HalfShell-$VERSION.dmg"
 
 STAGE=$(mktemp -d)
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/응용 프로그램"
 
 cat > "$STAGE/먼저 읽어주세요.txt" <<'EOF'
-AutoClamshell 설치 방법
+HalfShell 설치 방법
 ========================
 
-1. AutoClamshell.app 을 "응용 프로그램" 폴더로 드래그합니다.
+1. HalfShell.app 을 "응용 프로그램" 폴더로 드래그합니다.
 
 2. 이 앱은 Apple 개발자 서명이 없어서 처음 실행할 때 macOS가 차단합니다.
    터미널에서 아래 한 줄을 실행하면 해제됩니다:
 
-       xattr -cr /Applications/AutoClamshell.app
+       xattr -cr /Applications/HalfShell.app
 
    (또는 앱을 우클릭 → "열기" → 대화상자에서 다시 "열기")
 
@@ -36,7 +36,7 @@ EOF
 mkdir -p dist
 rm -f "$DMG"
 hdiutil create \
-  -volname "AutoClamshell" \
+  -volname "HalfShell" \
   -srcfolder "$STAGE" \
   -ov -format UDZO \
   "$DMG" >/dev/null

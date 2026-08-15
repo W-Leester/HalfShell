@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "AutoClamshell",
+    name: "HalfShell",
     platforms: [.macOS(.v13)],
     targets: [
         .executableTarget(
-            name: "AutoClamshell",
-            path: "Sources/AutoClamshell",
+            name: "HalfShell",
+            path: "Sources/HalfShell",
             swiftSettings: [.swiftLanguageMode(.v5)]
         )
     ]
