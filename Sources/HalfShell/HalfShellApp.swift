@@ -9,7 +9,7 @@ struct HalfShellApp: App {
     var body: some Scene {
         MenuBarExtra {
             Toggle("외장 연결 시 내장 디스플레이 자동 끄기", isOn: $controller.autoMode)
-                .disabled(!controller.skyLightAvailable)
+                .disabled(!controller.isUsable)
 
             Divider()
 
@@ -17,13 +17,16 @@ struct HalfShellApp: App {
                 Button("내장 디스플레이 켜기") { controller.manualEnable() }
             } else {
                 Button("내장 디스플레이 지금 끄기") { controller.manualDisable() }
-                    .disabled(!controller.externalConnected || !controller.skyLightAvailable)
+                    .disabled(!controller.externalConnected || !controller.isUsable)
             }
 
             Text(statusLine)
 
-            if !controller.skyLightAvailable {
-                Text("이 macOS 버전에서는 SkyLight API를 사용할 수 없습니다")
+            // 이 앱이 아무 일도 할 수 없는 Mac 이라면 이유를 분명히 알린다.
+            if !controller.hasBuiltinDisplay {
+                Text("이 Mac에는 내장 디스플레이가 없어 사용할 수 없습니다")
+            } else if !controller.skyLightAvailable {
+                Text("이 Mac에서는 SkyLight API를 사용할 수 없습니다")
             }
             if let error = controller.lastError {
                 Text("오류: \(error)")

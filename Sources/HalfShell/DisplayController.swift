@@ -47,6 +47,9 @@ final class DisplayController: ObservableObject {
     }
     @Published private(set) var builtinOff = false
     @Published private(set) var externalConnected = false
+    /// 이 Mac 에 내장 디스플레이가 있는지. Mac mini·Studio·Pro 에서는 false 이고,
+    /// 그 경우 이 앱은 할 수 있는 일이 없으므로 UI 를 모두 잠근다.
+    @Published private(set) var hasBuiltinDisplay = false
     @Published private(set) var lastError: String?
     @Published var launchAtLogin: Bool {
         didSet { applyLaunchAtLogin() }
@@ -63,6 +66,9 @@ final class DisplayController: ObservableObject {
     @Published private(set) var accessibilityTrusted = false
 
     var skyLightAvailable: Bool { SkyLight.shared != nil }
+
+    /// 이 Mac 에서 앱이 제 역할을 할 수 있는지. 둘 중 하나라도 없으면 UI 를 잠근다.
+    var isUsable: Bool { skyLightAvailable && hasBuiltinDisplay }
 
     private static let autoModeKey = "autoMode"
     private static let emergencyKey = "emergencyUnlockEnabled"
@@ -214,9 +220,12 @@ final class DisplayController: ObservableObject {
         if externalConnected != !externals.isEmpty { externalConnected = !externals.isEmpty }
 
         guard let builtin = builtinDisplayID else {
+            // 내장 디스플레이가 없는 Mac (mini·Studio·Pro). 할 수 있는 일이 없다.
+            if hasBuiltinDisplay { hasBuiltinDisplay = false }
             if builtinOff { builtinOff = false }
             return
         }
+        if !hasBuiltinDisplay { hasBuiltinDisplay = true }
         let isOff = !active.contains(builtin)
         if builtinOff != isOff { builtinOff = isOff }
 

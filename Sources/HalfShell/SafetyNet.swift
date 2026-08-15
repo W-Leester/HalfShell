@@ -34,6 +34,7 @@ final class SafetyNet {
     private var lastSignature = ""
     private var consecutiveFailures = 0
     private var retryNotBefore = Date.distantPast
+    private var loggedMissingBuiltin = false
 
     /// 연속 실패 시 재시도 간격 상한.
     private static let maxBackoff: Double = 60
@@ -120,9 +121,15 @@ final class SafetyNet {
         guard Date() >= retryNotBefore else { return }
 
         guard let target = BuiltinDisplay.resolve() else {
-            Log.write("[안전망] 긴급 — 실제 화면 없음. 그러나 복구할 내장 ID를 모른다")
+            // 내장 디스플레이가 없는 Mac 이면 이 상태가 계속 유지된다(화면 없이 돌리는
+            // Mac mini 등). 5초마다 같은 줄을 남기면 로그만 불어나므로 한 번만 남긴다.
+            if !loggedMissingBuiltin {
+                loggedMissingBuiltin = true
+                Log.write("[안전망] 실제 화면 없음. 복구할 내장 디스플레이가 없어 대기 (이후 생략)")
+            }
             return
         }
+        loggedMissingBuiltin = false
         Log.write("[안전망] 긴급 — 실제 화면 없음(active=\(all.sorted())). 내장 id=\(target) 복구 시도")
         guard let skyLight = SkyLight.shared else {
             Log.write("[안전망] 실패: SkyLight 사용 불가")

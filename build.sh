@@ -6,7 +6,11 @@ cd "$(dirname "$0")"
 APP=build/HalfShell.app
 ICNS=build/AppIcon.icns
 
-swift build -c release
+# Apple Silicon + Intel 유니버설 바이너리. 개발 기기 아키텍처로만 빌드하면
+# 다른 쪽 Mac 에서는 실행 자체가 되지 않는다.
+swift build -c release --arch arm64 --arch x86_64
+BINARY=.build/apple/Products/Release/HalfShell
+[[ -f "$BINARY" ]] || BINARY=.build/release/HalfShell
 
 # --- 앱 아이콘 (스크립트가 더 최신일 때만 다시 생성) ---
 if [[ ! -f "$ICNS" || scripts/make-icon.swift -nt "$ICNS" ]]; then
@@ -30,7 +34,7 @@ fi
 # --- 앱 번들 조립 ---
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp .build/release/HalfShell "$APP/Contents/MacOS/"
+cp "$BINARY" "$APP/Contents/MacOS/"
 cp Resources/Info.plist "$APP/Contents/"
 cp "$ICNS" "$APP/Contents/Resources/"
 
