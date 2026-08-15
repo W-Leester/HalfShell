@@ -16,7 +16,11 @@ private func displayReconfigured(
     // 메인 런루프를 거치지 않는 안전망부터 깨운다. 화면이 사라지는 순간에는
     // 메인 큐가 지연될 수 있으므로 이쪽이 먼저 반응해야 한다.
     SafetyNet.shared.alert()
+    let wasAdded = flags.contains(.addFlag)
     DispatchQueue.main.async {
+        if wasAdded {
+            DisplayController.shared.noteDisplayAdded(display)
+        }
         DisplayController.shared.handleReconfiguration()
     }
 }
@@ -40,6 +44,7 @@ final class DisplayController: ObservableObject {
             UserDefaults.standard.set(autoMode, forKey: Self.autoModeKey)
             if autoMode != oldValue {
                 manuallyDisabled = false
+                if autoMode { autoDisableArmed = true }
                 Log.write("[설정] 자동 모드 \(autoMode ? "켜짐" : "꺼짐")")
             }
             evaluate()
@@ -75,12 +80,17 @@ final class DisplayController: ObservableObject {
     private static let emergencyPromptedKey = "emergencyPermissionPrompted"
     /// 재구성 콜백이 실제 감지를 담당하므로 이 폴링은 예비 수단이다. 넉넉하게 둔다.
     private static let watchdogInterval: TimeInterval = 5
+    /// 깨어난 뒤 이 시간 안에 들어온 디스플레이 추가는 "복원"으로 보고 무시한다.
+    private static let wakeSettleWindow: TimeInterval = 5
 
     private var emergencyUnlock: EmergencyUnlock?
 
     /// 자동 모드가 꺼진 상태에서 사용자가 직접 끈 경우에만 true.
     /// 규칙 2가 곧바로 되돌리는 것을 막는다.
     private var manuallyDisabled = false
+    /// 자동 끄기 무장 상태. 깨어난 직후에는 해제된다 — ``handleWake()`` 참고.
+    private var autoDisableArmed = true
+    private var lastWakeAt = Date.distantPast
     private var pendingEvaluation: DispatchWorkItem?
     private var watchdog: Timer?
     /// 내장 디스플레이 ID. 꺼진 뒤에는 조회되지 않으므로 ``BuiltinDisplay`` 가 기억한다.
@@ -103,13 +113,21 @@ final class DisplayController: ObservableObject {
             MainActor.assumeIsolated { self?.handleReconfiguration() }
         }
 
-        // 잠자기에서 깨어날 때 디스플레이 구성이 바뀌어 있을 수 있다.
+        // 잠들기 전에 내장을 되돌려 놓는다. 꺼진 채로 잠들면 깨어났을 때
+        // 화면이 하나도 없는 상태에서 시작하게 되고, 그 상태에서는 사용자가
+        // 메뉴를 볼 수도 없다. 자는 동안 켜져 있어도 손해가 없다.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.prepareForSleep() }
+        }
+
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification,
             object: nil, queue: .main
         ) { [weak self] _ in
-            Log.write("[시스템] 깨어남")
-            MainActor.assumeIsolated { self?.handleReconfiguration() }
+            MainActor.assumeIsolated { self?.handleWake() }
         }
 
         watchdog = Timer.scheduledTimer(withTimeInterval: Self.watchdogInterval, repeats: true) { [weak self] _ in
@@ -139,6 +157,7 @@ final class DisplayController: ObservableObject {
     func manualDisable() {
         guard externalConnected else { return }
         manuallyDisabled = !autoMode
+        autoDisableArmed = true   // 사용자가 직접 지시했으므로 보류를 푼다
         Log.write("[조작] 수동 끄기")
         disableBuiltin()
     }
@@ -197,6 +216,44 @@ final class DisplayController: ObservableObject {
 
     // MARK: - 감시
 
+    /// 잠들기 직전: 내장을 되돌려 놓는다.
+    private func prepareForSleep() {
+        Log.write("[시스템] 잠들기 — 내장 디스플레이 선복구")
+        enableBuiltin()
+    }
+
+    /// 깨어난 직후.
+    ///
+    /// **깨어난 뒤에 관찰된 외장만 보고 내장을 끄지 않는다.** 잠에서 깨어날 때
+    /// macOS 가 이전 배치를 복원하면서, 실제로는 연결되어 있지 않은 디스플레이가
+    /// 활성 목록에 나타나는 것을 실측으로 확인했다(사건 3 — 독을 뽑고 밖에서
+    /// 뚜껑을 열었는데 `실제=[33, 34]` 로 보였고 화면은 검은 채였다).
+    /// 그것을 실제 화면으로 착각하면 "화면이 있으니 내장은 꺼둬도 된다"고 판단해
+    /// 검은 화면에서 깨어나게 된다.
+    ///
+    /// 그래서 깨어난 직후에는 내장을 켜고, **새로운 디스플레이 연결이 실제로
+    /// 일어날 때까지** 자동 끄기를 보류한다. 책상에서 독을 꽂은 채 깨운 경우에는
+    /// 내장이 함께 켜진 상태로 남으므로, 케이블을 다시 꽂거나 메뉴에서 한 번
+    /// 눌러주면 된다. 검은 화면으로 깨어나는 것보다는 낫다.
+    private func handleWake() {
+        Log.write("[시스템] 깨어남 — 내장 복구 후 자동 끄기 보류")
+        autoDisableArmed = false
+        lastWakeAt = Date()
+        enableBuiltin()
+        handleReconfiguration()
+    }
+
+    /// 디스플레이가 새로 붙었을 때 호출된다. 깨어난 직후의 무더기 재구성과
+    /// 사용자가 실제로 케이블을 꽂은 것을 구분하기 위해 시간차를 둔다.
+    func noteDisplayAdded(_ display: CGDirectDisplayID) {
+        guard !autoDisableArmed else { return }
+        guard Date().timeIntervalSince(lastWakeAt) > Self.wakeSettleWindow else { return }
+        guard CGDisplayIsBuiltin(display) == 0 else { return }
+        autoDisableArmed = true
+        Log.write("[자동] 새 외장 연결(display=\(display)) → 자동 끄기 재무장")
+        handleReconfiguration()
+    }
+
     /// 재구성 알림은 한 번의 변경에도 여러 번 몰려온다. 긴급 복구는 즉시 처리하고,
     /// 나머지 판단만 짧게 디바운스한다.
     func handleReconfiguration() {
@@ -233,14 +290,19 @@ final class DisplayController: ObservableObject {
         if builtinOff != isOff { builtinOff = isOff }
 
         if externals.isEmpty {
+            // 외장이 하나도 없는 상태를 지나갔다면, 다음에 붙는 것은 진짜 연결이다.
+            if !autoDisableArmed {
+                autoDisableArmed = true
+                Log.write("[자동] 외장 0개 확인 → 자동 끄기 재무장")
+            }
             // 규칙 1: 외장이 없으면 무조건 켠다.
             if isOff {
                 Log.write("[규칙1] 외장 0개 + 내장 꺼짐 → 복구")
                 enableBuiltin()
             }
         } else if autoMode {
-            // 규칙 3
-            if !isOff { disableBuiltin() }
+            // 규칙 3. 단, 깨어난 직후 관찰만으로는 끄지 않는다(handleWake 참고).
+            if !isOff, autoDisableArmed { disableBuiltin() }
         } else if isOff, !manuallyDisabled {
             // 규칙 2: 자동 모드가 꺼져 있는데 내장이 꺼져 있다 → 자가 치유
             Log.write("[규칙2] 자동 모드 꺼짐 + 내장 꺼짐 → 자가 치유")

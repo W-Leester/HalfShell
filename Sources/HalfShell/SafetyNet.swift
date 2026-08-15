@@ -91,7 +91,14 @@ final class SafetyNet {
         let all = DisplayInfo.activeDisplays()
         let real = all.filter { !DisplayInfo.isVirtual($0) }
 
-        let signature = "active=\(all.sorted()) 실제=\(real.sorted())"
+        // 사건 3에서 "실제"로 분류된 디스플레이가 사실은 아무것도 표시하지 않는
+        // 유령이었다. 다음에 같은 일이 생기면 정체를 알 수 있도록 속성을 남긴다.
+        let detail = all.sorted().map { id in
+            "\(id)(\(CGDisplayPixelsWide(id))x\(CGDisplayPixelsHigh(id))"
+                + " v=\(CGDisplayVendorNumber(id)) m=\(CGDisplayModelNumber(id))"
+                + " builtin=\(CGDisplayIsBuiltin(id) != 0))"
+        }.joined(separator: " ")
+        let signature = "active=\(all.sorted()) 실제=\(real.sorted()) [\(detail)]"
         if signature != lastSignature {
             lastSignature = signature
             Log.write("[안전망] \(signature)")
