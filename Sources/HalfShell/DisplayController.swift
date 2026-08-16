@@ -226,13 +226,24 @@ final class DisplayController: ObservableObject {
     // MARK: - 감시
 
     /// 잠들기 직전: 내장을 되돌려 놓는다.
+    /// 잠들기 직전 시도.
+    ///
+    /// **메인 스레드를 막지 않는다.** 이 시점의 커밋은 실패하는 것이 정상이고
+    /// (실측 2/2 실패, 오류 1001·1014), 실패할 때 **약 10초를 블로킹한다.**
+    /// 그대로 두면 그만큼 잠자기 진입이 늦어진다.
+    ///
+    /// 그래서 최선 노력으로만 던져두고, 실제 보장은 깨어난 뒤
+    /// ``restoreBuiltinPersistently(attemptsLeft:)`` 가 맡는다(실측으로 27ms 만에 복구).
     private func prepareForSleep() {
-        Log.write("[시스템] 잠들기 — 내장 디스플레이 선복구")
-        enableBuiltin()
-        // 여기서 실패해도(1001) 깨어난 뒤 restoreBuiltinPersistently 가 다시 맡는다.
-        // 잠들기 직전에는 재시도할 시간이 없으므로 이쪽은 최선 노력으로만 둔다.
-        if let builtin = builtinDisplayID, !DisplayInfo.realActiveDisplays().contains(builtin) {
-            Log.write("[시스템] 잠들기 선복구 실패 — 깨어날 때 다시 시도한다")
+        Log.write("[시스템] 잠들기 — 내장 선복구 시도(실패해도 깨어날 때 복구한다)")
+        guard let skyLight = SkyLight.shared, let id = builtinDisplayID else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try skyLight.setDisplay(id, enabled: true, scope: .session)
+                Log.write("[시스템] 잠들기 선복구 성공")
+            } catch {
+                Log.write("[시스템] 잠들기 선복구 실패: \(error.localizedDescription)")
+            }
         }
     }
 
