@@ -18,7 +18,7 @@ import Foundation
 @MainActor
 final class EmergencyUnlock {
     static let requiredTaps = 5
-    static let window: TimeInterval = 2
+    static let window: TimeInterval = 3
 
     private var monitors: [Any] = []
     private var tapTimes: [Date] = []
@@ -49,7 +49,7 @@ final class EmergencyUnlock {
         }
         // 다른 키가 눌리면 "단독 연타"가 아니므로 처음부터 다시 센다.
         let keyMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { [weak self] _ in
-            MainActor.assumeIsolated { self?.resetCount() }
+            MainActor.assumeIsolated { self?.noteReset(reason: "다른 키 입력") }
         }
         monitors = [flagMonitor, keyMonitor].compactMap { $0 }
         Log.write("[비상] Command \(Self.requiredTaps)번 연타 감지 시작")
@@ -65,9 +65,15 @@ final class EmergencyUnlock {
 
     private func handleFlagsChanged(_ event: NSEvent) {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        let otherModifiers: NSEvent.ModifierFlags = [.shift, .control, .option, .function, .capsLock]
-        guard flags.intersection(otherModifiers).isEmpty else {
-            resetCount()
+        // 실제로 "함께 눌린" 보조키만 본다.
+        //
+        // `.capsLock` 을 여기 넣었던 것이 버그였다. 그것은 누르고 있는 키가 아니라
+        // **켜짐/꺼짐 상태**라서, Caps Lock 이 켜져 있으면 모든 이벤트에 플래그가
+        // 붙어 카운트가 매번 초기화된다 — 연타가 영영 걸리지 않는다.
+        // `.function` 도 외장 키보드에서 오탐이 잦아 제외한다.
+        let chordModifiers: NSEvent.ModifierFlags = [.shift, .control, .option]
+        guard flags.intersection(chordModifiers).isEmpty else {
+            noteReset(reason: "다른 보조키")
             return
         }
 
@@ -79,10 +85,24 @@ final class EmergencyUnlock {
         tapTimes.append(now)
         tapTimes.removeAll { now.timeIntervalSince($0) > Self.window }
 
-        guard tapTimes.count >= Self.requiredTaps else { return }
+        guard tapTimes.count >= Self.requiredTaps else {
+            // 진행 상황을 남긴다. 안 걸릴 때 원인을 알 수 있어야 한다.
+            if tapTimes.count >= 2 {
+                Log.write("[비상] Command \(tapTimes.count)/\(Self.requiredTaps)")
+            }
+            return
+        }
         resetCount()
         Log.write("[비상] Command 연타 감지 → 내장 디스플레이 복구")
         onTrigger()
+    }
+
+    /// 세고 있던 중에 끊겼을 때만 기록한다. 평상시에는 로그를 채우지 않는다.
+    private func noteReset(reason: String) {
+        if tapTimes.count >= 2 {
+            Log.write("[비상] 연타 카운트 초기화(\(tapTimes.count)회에서) — \(reason)")
+        }
+        resetCount()
     }
 
     private func resetCount() {
