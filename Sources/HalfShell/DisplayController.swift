@@ -213,6 +213,8 @@ final class DisplayController: ObservableObject {
         // 권한을 나중에 허용했다면 그때 모니터를 붙인다.
         if emergencyUnlockEnabled, trusted, !emergencyUnlock.isRunning {
             emergencyUnlock.start()
+        } else if emergencyUnlockEnabled, trusted {
+            emergencyUnlock.restartIfStale()
         }
     }
 

@@ -19,10 +19,14 @@ import Foundation
 final class EmergencyUnlock {
     static let requiredTaps = 5
     static let window: TimeInterval = 3
+    /// 이 시간 동안 입력 이벤트를 하나도 못 보면 모니터가 죽은 것으로 보고 재등록한다.
+    private static let staleThreshold: TimeInterval = 60
 
     private var monitors: [Any] = []
     private var tapTimes: [Date] = []
     private var commandWasDown = false
+    private var lastEventAt = Date.distantPast
+    private var lastStuckLogAt = Date.distantPast
     private let onTrigger: () -> Void
 
     init(onTrigger: @escaping () -> Void) {
@@ -55,6 +59,20 @@ final class EmergencyUnlock {
         Log.write("[비상] Command \(Self.requiredTaps)번 연타 감지 시작")
     }
 
+    /// 모니터가 조용히 죽는 경우에 대비한 자가 치유.
+    ///
+    /// 전역 이벤트 모니터는 객체가 살아 있어도 실제로는 이벤트를 못 받는 상태가
+    /// 될 수 있다. `isRunning` 은 객체 유무만 보므로 그것을 잡아내지 못한다.
+    /// 오랫동안 아무 이벤트도 못 봤다면 붙였다 떼서 되살린다. 재등록은 값이
+    /// 싸므로 사용자가 자리를 비워 조용했던 경우에 걸려도 손해가 없다.
+    func restartIfStale() {
+        guard isRunning, isTrusted else { return }
+        guard Date().timeIntervalSince(lastEventAt) > Self.staleThreshold else { return }
+        Log.write("[비상] 오랫동안 입력 이벤트가 없어 감지기를 재등록한다")
+        lastEventAt = Date()
+        start()
+    }
+
     func stop() {
         for monitor in monitors { NSEvent.removeMonitor(monitor) }
         monitors.removeAll()
@@ -77,11 +95,26 @@ final class EmergencyUnlock {
             return
         }
 
+        // "누름"만 세려고 직전 상태를 들고 있는데, 뗌 이벤트를 한 번이라도 놓치면
+        // 눌림 상태가 계속 남아 **이후의 모든 누름이 무시된다.** 실사용에서 연타가
+        // 통째로 먹히지 않은 경우가 있었고(로그에 카운트가 한 줄도 안 남았다),
+        // 이 상태 고착이 유력한 원인이다. 마지막 이벤트로부터 오래 지났으면
+        // 들고 있던 상태를 신뢰하지 않는다.
+        let now = Date()
+        if now.timeIntervalSince(lastEventAt) > Self.window {
+            commandWasDown = false
+        }
+        lastEventAt = now
+
         let commandDown = flags.contains(.command)
+        let ignoredWhileDown = commandDown && commandWasDown
         defer { commandWasDown = commandDown }
+        if ignoredWhileDown, now.timeIntervalSince(lastStuckLogAt) > 5 {
+            lastStuckLogAt = now
+            Log.write("[비상] 눌림 상태가 남아 있어 이번 누름을 무시함(뗌 이벤트 유실 추정)")
+        }
         guard commandDown, !commandWasDown else { return }  // 누르는 순간만 센다(뗄 때는 무시)
 
-        let now = Date()
         tapTimes.append(now)
         tapTimes.removeAll { now.timeIntervalSince($0) > Self.window }
 
