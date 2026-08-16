@@ -82,6 +82,9 @@ final class DisplayController: ObservableObject {
     private static let watchdogInterval: TimeInterval = 5
     /// 깨어난 뒤 이 시간 안에 들어온 디스플레이 추가는 "복원"으로 보고 무시한다.
     private static let wakeSettleWindow: TimeInterval = 5
+    /// 깨어난 직후 내장 복구 재시도 횟수·간격. 커밋이 1001 로 밀리는 구간을 넘긴다.
+    private static let wakeRestoreAttempts = 12
+    private static let wakeRestoreInterval: TimeInterval = 0.5
 
     private var emergencyUnlock: EmergencyUnlock?
 
@@ -226,6 +229,11 @@ final class DisplayController: ObservableObject {
     private func prepareForSleep() {
         Log.write("[시스템] 잠들기 — 내장 디스플레이 선복구")
         enableBuiltin()
+        // 여기서 실패해도(1001) 깨어난 뒤 restoreBuiltinPersistently 가 다시 맡는다.
+        // 잠들기 직전에는 재시도할 시간이 없으므로 이쪽은 최선 노력으로만 둔다.
+        if let builtin = builtinDisplayID, !DisplayInfo.realActiveDisplays().contains(builtin) {
+            Log.write("[시스템] 잠들기 선복구 실패 — 깨어날 때 다시 시도한다")
+        }
     }
 
     /// 깨어난 직후.
@@ -245,8 +253,32 @@ final class DisplayController: ObservableObject {
         Log.write("[시스템] 깨어남 — 내장 복구 후 자동 끄기 보류")
         autoDisableArmed = false
         lastWakeAt = Date()
-        enableBuiltin()
+        restoreBuiltinPersistently(attemptsLeft: Self.wakeRestoreAttempts)
         handleReconfiguration()
+    }
+
+    /// 실제로 켜질 때까지 짧게 재시도한다.
+    ///
+    /// 잠들기·깨어나기 직후에는 WindowServer 가 아직 디스플레이 구성을 정리하는
+    /// 중이라 커밋이 밀려 **오류 1001 로 실패한다**(실측). 한 번 호출하고 마는
+    /// 방식이면 그 실패가 그대로 검은 화면이 된다 — 자동 모드가 켜져 있으면
+    /// 규칙 1(외장 0개)도 규칙 2(자동 모드 꺼짐)도 발동 조건이 아니라
+    /// 아무도 다시 켜주지 않기 때문이다.
+    private func restoreBuiltinPersistently(attemptsLeft: Int) {
+        if let builtin = builtinDisplayID,
+           DisplayInfo.realActiveDisplays().contains(builtin) {
+            return  // 이미 켜져 있다
+        }
+        guard attemptsLeft > 0 else {
+            Log.write("[시스템] 내장 복구 재시도를 모두 소진했다")
+            return
+        }
+        enableBuiltin()
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.wakeRestoreInterval) { [weak self] in
+            MainActor.assumeIsolated {
+                self?.restoreBuiltinPersistently(attemptsLeft: attemptsLeft - 1)
+            }
+        }
     }
 
     /// 디스플레이가 새로 붙었을 때 호출된다. 깨어난 직후의 무더기 재구성과
