@@ -38,8 +38,34 @@ cp "$BINARY" "$APP/Contents/MacOS/"
 cp Resources/Info.plist "$APP/Contents/"
 cp "$ICNS" "$APP/Contents/Resources/"
 
-# 로컬 실행용 ad-hoc 서명 (SMAppService 로그인 등록에 필요)
-codesign --force --sign - "$APP"
+# 서명. 가능한 한 실제 인증서를 쓴다.
+#
+# ad-hoc 서명(`-`)은 팀 ID 가 없고 재빌드할 때마다 해시가 바뀌어서, macOS 가
+# 매번 다른 앱으로 본다. 그러면 **손쉬운 사용 권한이 붙지 않는다.** 비상 탈출이
+# 조용히 죽는 원인이 이것이었다. 정식 인증서로 서명하면 팀 ID 가 고정되어
+# 권한이 재빌드 후에도 유지된다.
+#
+# 우선순위: Developer ID(배포용) → Apple Development(로컬) → ad-hoc(최후)
+pick_identity() {
+  local list id
+  list=$(security find-identity -v -p codesigning 2>/dev/null || true)
+  for prefix in "Developer ID Application" "Apple Development"; do
+    id=$(printf '%s\n' "$list" | grep -F "$prefix" | head -1 | sed -E 's/.*"(.*)"/\1/' || true)
+    if [[ -n "$id" ]]; then
+      printf '%s\n' "$id"
+      return 0
+    fi
+  done
+  printf '%s\n' "-"
+}
+IDENTITY=$(pick_identity)
+if [[ "$IDENTITY" == "-" ]]; then
+  echo "경고: 정식 인증서가 없어 ad-hoc 으로 서명합니다."
+  echo "      재빌드할 때마다 손쉬운 사용 권한이 풀릴 수 있습니다."
+else
+  echo "서명: $IDENTITY"
+fi
+codesign --force --timestamp=none --sign "$IDENTITY" "$APP"
 
 echo "완료: $APP"
 echo "설치: ./install.sh    (또는 Finder에서 응용 프로그램으로 드래그)"

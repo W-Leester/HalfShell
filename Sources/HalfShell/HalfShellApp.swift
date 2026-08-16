@@ -43,6 +43,7 @@ struct HalfShellApp: App {
             Divider()
 
             Toggle("로그인 시 실행", isOn: $controller.launchAtLogin)
+            Button("설정 도우미 열기…") { SetupWindowController.shared.show() }
             Button("로그 열기") { NSWorkspace.shared.open(Log.fileURL) }
 
             Divider()
@@ -78,6 +79,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.startSession("HalfShell \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "?")")
         SafetyNet.shared.start()
         _ = DisplayController.shared
+        // 설치 직후 한 번은 눈에 보이는 곳에서 안내한다. 특히 손쉬운 사용 권한은
+        // 안 켜두면 비상 탈출이 조용히 죽는다.
+        SetupWindowController.shared.showIfNeeded()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

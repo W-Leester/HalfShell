@@ -183,6 +183,12 @@ final class DisplayController: ObservableObject {
         manualEnable()
     }
 
+    /// 손쉬운 사용 권한을 요청한다. macOS 가 띄우는 대화상자에 "시스템 설정 열기"
+    /// 버튼이 들어 있어, 설정 앱 식별자가 버전마다 달라지는 문제를 겪지 않는다.
+    func requestAccessibilityPermission() {
+        emergencyUnlock?.requestPermission()
+    }
+
     private func applyEmergencyUnlock(requestingPermission: Bool) {
         guard let emergencyUnlock else { return }
         guard emergencyUnlockEnabled else {
