@@ -5,6 +5,7 @@ import SwiftUI
 struct HalfShellApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var controller = DisplayController.shared
+    @StateObject private var updates = UpdateMonitor.shared
 
     var body: some Scene {
         MenuBarExtra {
@@ -43,6 +44,9 @@ struct HalfShellApp: App {
             Divider()
 
             Toggle("로그인 시 실행", isOn: $controller.launchAtLogin)
+            if let version = updates.availableVersion {
+                Button("새 버전 \(version) 받기…") { updates.openReleasesPage() }
+            }
             Button("현재 설정 보기") { SetupWindowController.shared.show() }
             Button("로그 열기") { NSWorkspace.shared.open(Log.fileURL) }
 
@@ -82,6 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 설치 직후 한 번은 눈에 보이는 곳에서 안내한다. 특히 손쉬운 사용 권한은
         // 안 켜두면 비상 탈출이 조용히 죽는다.
         SetupWindowController.shared.showIfNeeded()
+        UpdateMonitor.shared.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

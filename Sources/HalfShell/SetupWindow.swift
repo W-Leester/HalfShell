@@ -45,7 +45,7 @@ final class SetupWindowController: NSObject, NSWindowDelegate {
 
 private struct SetupView: View {
     @ObservedObject private var controller = DisplayController.shared
-    @State private var update: UpdateCheck.Result = .unavailable
+    @ObservedObject private var updates = UpdateMonitor.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -67,7 +67,7 @@ private struct SetupView: View {
         }
         .padding(24)
         .frame(width: 460)
-        .task { update = await UpdateCheck.check() }
+        .onAppear { updates.checkNow() }
     }
 
     private var header: some View {
@@ -137,13 +137,11 @@ private struct SetupView: View {
 
     private var footer: some View {
         HStack {
-            switch update {
-            case .updateAvailable(let version):
-                Button("새 버전 \(version) 받기") { NSWorkspace.shared.open(UpdateCheck.releasesURL) }
-            case .upToDate:
-                Text("최신 버전입니다.").font(.caption).foregroundStyle(.secondary)
-            case .unavailable:
-                Text("업데이트를 확인하지 못했습니다.").font(.caption).foregroundStyle(.tertiary)
+            if let version = updates.availableVersion {
+                Button("새 버전 \(version) 받기") { updates.openReleasesPage() }
+            } else {
+                Text("업데이트는 하루 한 번 자동으로 확인합니다.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
             Button("확인") { NSApp.keyWindow?.close() }
