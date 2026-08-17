@@ -20,13 +20,17 @@ final class EmergencyUnlock {
     static let requiredTaps = 5
     static let window: TimeInterval = 3
     /// 이 시간 동안 입력 이벤트를 하나도 못 보면 모니터가 죽은 것으로 보고 재등록한다.
-    private static let staleThreshold: TimeInterval = 60
+    /// 자리를 비우면 몇 분씩 조용한 것이 정상이므로 넉넉하게 잡는다. 짧게 잡으면
+    /// 멀쩡한 모니터를 계속 붙였다 뗐다 하면서 오히려 이벤트를 놓칠 수 있다.
+    private static let staleThreshold: TimeInterval = 300
 
     private var monitors: [Any] = []
     private var tapTimes: [Date] = []
     private var commandWasDown = false
     private var lastEventAt = Date.distantPast
     private var lastStuckLogAt = Date.distantPast
+    private var diagnosticUntil = Date.distantPast
+    private var diagnosticCount = 0
     private let onTrigger: () -> Void
 
     init(onTrigger: @escaping () -> Void) {
@@ -70,7 +74,9 @@ final class EmergencyUnlock {
         guard Date().timeIntervalSince(lastEventAt) > Self.staleThreshold else { return }
         Log.write("[비상] 오랫동안 입력 이벤트가 없어 감지기를 재등록한다")
         lastEventAt = Date()
+        let preserved = tapTimes   // 재등록 때문에 세던 카운트를 잃지 않는다
         start()
+        tapTimes = preserved
     }
 
     func stop() {
@@ -81,8 +87,24 @@ final class EmergencyUnlock {
 
     // MARK: - Private
 
+    /// 내장을 끈 직후처럼 "연타가 안 먹는다"는 구간에서, 이벤트가 **아예 안 들어오는
+    /// 것인지** 아니면 들어오는데 카운트가 안 되는 것인지 구분하기 위한 진단 창.
+    /// 둘은 원인도 대책도 완전히 다르므로 추측으로 넘길 수 없다.
+    func beginDiagnosticWindow(seconds: TimeInterval) {
+        diagnosticUntil = Date().addingTimeInterval(seconds)
+        diagnosticCount = 0
+        Log.write("[비상] 진단 창 시작 — 이후 \(Int(seconds))초간 입력 이벤트를 기록한다")
+    }
+
     private func handleFlagsChanged(_ event: NSEvent) {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+        if Date() < diagnosticUntil, diagnosticCount < 60 {
+            diagnosticCount += 1
+            Log.write("[비상·진단] flagsChanged 수신 flags=\(flags.rawValue) "
+                + "cmd=\(flags.contains(.command)) 직전눌림=\(commandWasDown) 카운트=\(tapTimes.count)")
+        }
+
         // 실제로 "함께 눌린" 보조키만 본다.
         //
         // `.capsLock` 을 여기 넣었던 것이 버그였다. 그것은 누르고 있는 키가 아니라

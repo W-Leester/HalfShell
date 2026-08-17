@@ -371,6 +371,9 @@ final class DisplayController: ObservableObject {
             builtinOff = true
             lastError = nil
             Log.write("[동작] 내장(id=\(id)) 끔")
+            // 끈 직후가 비상 탈출이 가장 필요한 순간이자, 실제로 연타가 먹지
+            // 않는다는 보고가 나온 구간이다. 무슨 일이 벌어지는지 기록한다.
+            emergencyUnlock?.beginDiagnosticWindow(seconds: 30)
         } catch {
             lastError = error.localizedDescription
             Log.write("[동작] 내장 끄기 실패: \(error.localizedDescription)")
