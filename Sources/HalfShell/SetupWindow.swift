@@ -151,11 +151,7 @@ private struct SetupView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
-            VStack(alignment: .trailing, spacing: 4) {
-                Button("오류 신고하기") { ReportWindowController.shared.show() }
-                Button("로그 열기") { NSWorkspace.shared.open(Log.fileURL) }
-                    .buttonStyle(.link).font(.caption)
-            }
+            Button("오류 신고하기") { ReportWindowController.shared.show() }
         }
     }
 
