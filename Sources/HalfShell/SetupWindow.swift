@@ -1,12 +1,14 @@
 import AppKit
 import SwiftUI
 
-/// 첫 실행 안내 창.
+/// 현재 설정을 한눈에 보여주는 창.
 ///
-/// 이 앱은 메뉴바에만 존재해서 사용자가 설정을 찾아 들어가기 어렵다. 특히
-/// **손쉬운 사용 권한은 안 켜두면 비상 탈출이 조용히 죽는다.** 실제로 그 상태에서
-/// 검은 화면을 만나 강제 재부팅까지 간 적이 있다(장애 기록 사건 3).
-/// 그래서 설치 직후 한 번은 눈에 보이는 곳에서 안내한다.
+/// 이 앱은 메뉴바에만 존재해서 상태를 파악하기 어렵다. 특히 **손쉬운 사용 권한은
+/// 안 켜두면 비상 탈출이 조용히 죽는다.** 실제로 그 상태에서 검은 화면을 만나
+/// 강제 재부팅까지 간 적이 있다(장애 기록 사건 3-B).
+///
+/// 값을 바꾸는 곳은 메뉴바다. 여기서는 **보여주기만 한다** — 같은 설정을 두 곳에서
+/// 바꿀 수 있으면 어느 쪽이 진짜인지 헷갈린다.
 @MainActor
 final class SetupWindowController: NSObject, NSWindowDelegate {
     static let shared = SetupWindowController()
@@ -14,10 +16,9 @@ final class SetupWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     private static let completedKey = "setupCompleted"
 
-    /// 처음 실행이거나 아직 권한이 없으면 자동으로 띄운다.
+    /// 처음 실행이면 자동으로 띄운다.
     func showIfNeeded() {
-        let done = UserDefaults.standard.bool(forKey: Self.completedKey)
-        guard !done else { return }
+        guard !UserDefaults.standard.bool(forKey: Self.completedKey) else { return }
         show()
     }
 
@@ -25,7 +26,7 @@ final class SetupWindowController: NSObject, NSWindowDelegate {
         if window == nil {
             let hosting = NSHostingController(rootView: SetupView())
             let w = NSWindow(contentViewController: hosting)
-            w.title = "HalfShell 설정"
+            w.title = "HalfShell"
             w.styleMask = [.titled, .closable]
             w.isReleasedWhenClosed = false
             w.delegate = self
@@ -44,18 +45,11 @@ final class SetupWindowController: NSObject, NSWindowDelegate {
 
 private struct SetupView: View {
     @ObservedObject private var controller = DisplayController.shared
+    @State private var update: UpdateCheck.Result = .unavailable
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("HalfShell 설정")
-                    .font(.title2).bold()
-                Text("뚜껑을 연 채로 내장 디스플레이만 끄고 외장만 사용합니다.\n"
-                    + "클램쉘과 화면 구성은 같지만, 뚜껑을 닫지 않아 발열이 덜합니다.")
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
+        VStack(alignment: .leading, spacing: 16) {
+            header
             Divider()
 
             if !controller.hasBuiltinDisplay {
@@ -63,52 +57,97 @@ private struct SetupView: View {
                       systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.orange)
             } else {
-                Toggle("외장 연결 시 내장 디스플레이 자동 끄기", isOn: $controller.autoMode)
-                Toggle("로그인 시 자동 실행", isOn: $controller.launchAtLogin)
-
+                settingsStatus
                 Divider()
-
-                // 여기가 이 창의 존재 이유다.
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 6) {
-                        Image(systemName: controller.accessibilityTrusted
-                              ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                            .foregroundStyle(controller.accessibilityTrusted ? .green : .orange)
-                        Text("비상 탈출 — Command 키 5번 연타")
-                            .bold()
-                    }
-                    Text(controller.accessibilityTrusted
-                         ? "준비됐습니다. 화면이 보이지 않을 때 Command 를 2초 안에 5번 누르면 내장 화면이 켜집니다."
-                         : "손쉬운 사용 권한이 필요합니다. 지금은 작동하지 않습니다.\n"
-                           + "화면이 검게 남았을 때 손만으로 빠져나올 수 있는 유일한 방법이므로 켜두시길 권합니다.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    if !controller.accessibilityTrusted {
-                        Button("손쉬운 사용 설정 열기…") {
-                            controller.requestAccessibilityPermission()
-                        }
-                        Text("시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용 에서 HalfShell 을 켭니다.\n"
-                            + "이름이 같은 \"시스템 설정 → 손쉬운 사용\"은 다른 곳입니다.")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
+                emergencySection
             }
 
             Divider()
-
-            HStack {
-                Text("나중에 메뉴바 아이콘에서 다시 열 수 있습니다.")
-                    .font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Button("완료") { NSApp.keyWindow?.close() }
-                    .keyboardShortcut(.defaultAction)
-            }
+            footer
         }
         .padding(24)
         .frame(width: 460)
+        .task { update = await UpdateCheck.check() }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("HalfShell").font(.title2).bold()
+                Text("버전 \(UpdateCheck.currentVersion) (빌드 \(UpdateCheck.buildNumber))")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+            Text("뚜껑을 연 채로 내장 디스플레이만 끄고 외장만 사용합니다.\n"
+                + "클램쉘과 화면 구성은 같지만, 뚜껑을 닫지 않아 발열이 덜합니다.")
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// 값 변경은 메뉴바에서 한다. 여기서는 상태만 보여준다.
+    private var settingsStatus: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            statusRow("외장 연결 시 내장 디스플레이 자동 끄기", on: controller.autoMode)
+            statusRow("로그인 시 자동 실행", on: controller.launchAtLogin)
+            Text("변경은 메뉴바 아이콘에서 합니다.")
+                .font(.caption).foregroundStyle(.tertiary)
+        }
+    }
+
+    private func statusRow(_ title: String, on: Bool) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(on ? .green : .secondary)
+            Text(title)
+            Spacer()
+            Text(on ? "켜짐" : "꺼짐")
+                .font(.callout)
+                .foregroundStyle(on ? .primary : .secondary)
+        }
+    }
+
+    private var emergencySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: controller.accessibilityTrusted
+                      ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                    .foregroundStyle(controller.accessibilityTrusted ? .green : .orange)
+                Text("비상 탈출 — Command 키 5번 연타").bold()
+                Spacer()
+                Text(controller.accessibilityTrusted ? "준비됨" : "작동 안 함")
+                    .font(.callout)
+                    .foregroundStyle(controller.accessibilityTrusted ? Color.primary : Color.orange)
+            }
+            Text(controller.accessibilityTrusted
+                 ? "화면이 보이지 않을 때 Command 를 4초 안에 5번 누르면 내장 화면이 켜집니다."
+                 : "손쉬운 사용 권한이 필요합니다. 화면이 검게 남았을 때 손만으로 빠져나올 수 "
+                   + "있는 유일한 방법이므로 켜두시길 권합니다.")
+                .font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if !controller.accessibilityTrusted {
+                Button("손쉬운 사용 설정 열기…") { controller.requestAccessibilityPermission() }
+                Text("시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용 에서 HalfShell 을 켭니다.\n"
+                    + "이름이 같은 \"시스템 설정 → 손쉬운 사용\"은 다른 곳입니다.")
+                    .font(.caption).foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var footer: some View {
+        HStack {
+            switch update {
+            case .updateAvailable(let version):
+                Button("새 버전 \(version) 받기") { NSWorkspace.shared.open(UpdateCheck.releasesURL) }
+            case .upToDate:
+                Text("최신 버전입니다.").font(.caption).foregroundStyle(.secondary)
+            case .unavailable:
+                Text("업데이트를 확인하지 못했습니다.").font(.caption).foregroundStyle(.tertiary)
+            }
+            Spacer()
+            Button("확인") { NSApp.keyWindow?.close() }
+                .keyboardShortcut(.defaultAction)
+        }
     }
 }

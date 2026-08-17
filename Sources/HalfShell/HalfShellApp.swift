@@ -43,7 +43,7 @@ struct HalfShellApp: App {
             Divider()
 
             Toggle("로그인 시 실행", isOn: $controller.launchAtLogin)
-            Button("설정 도우미 열기…") { SetupWindowController.shared.show() }
+            Button("현재 설정 보기") { SetupWindowController.shared.show() }
             Button("로그 열기") { NSWorkspace.shared.open(Log.fileURL) }
 
             Divider()
