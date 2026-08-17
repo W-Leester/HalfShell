@@ -63,6 +63,8 @@ private struct SetupView: View {
             }
 
             Divider()
+            troubleshooting
+            Divider()
             footer
         }
         .padding(24)
@@ -132,6 +134,23 @@ private struct SetupView: View {
                     .font(.caption).foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+
+    /// 로그는 평상시 메뉴에 두지 않는다. 대부분의 사용자에게는 의미 없는 항목이고,
+    /// 정작 필요한 사람은 문제가 생겨 이 창을 열어본 사람이다.
+    /// 이름에 목적을 드러내야 무엇에 쓰는 것인지 알 수 있다.
+    private var troubleshooting: some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("문제가 생겼다면").font(.callout).bold()
+                Text("디스플레이 변화와 복구 시도가 모두 기록됩니다.\n"
+                    + "신고하실 때 이 파일을 함께 보내주시면 원인을 찾을 수 있습니다.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            Button("로그 열기") { NSWorkspace.shared.open(Log.fileURL) }
         }
     }
 

@@ -49,7 +49,6 @@ struct HalfShellApp: App {
                 Button("새 버전 \(version) 받기…") { updates.openReleasesPage() }
             }
             Button("현재 설정 보기") { SetupWindowController.shared.show() }
-            Button("로그 열기") { NSWorkspace.shared.open(Log.fileURL) }
 
             Divider()
 
