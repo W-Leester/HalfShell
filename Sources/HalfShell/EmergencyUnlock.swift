@@ -19,10 +19,6 @@ import Foundation
 final class EmergencyUnlock {
     static let requiredTaps = 5
     static let window: TimeInterval = 4
-    /// 이 시간 동안 입력 이벤트를 하나도 못 보면 모니터가 죽은 것으로 보고 재등록한다.
-    /// 자리를 비우면 몇 분씩 조용한 것이 정상이므로 넉넉하게 잡는다. 짧게 잡으면
-    /// 멀쩡한 모니터를 계속 붙였다 뗐다 하면서 오히려 이벤트를 놓칠 수 있다.
-    private static let staleThreshold: TimeInterval = 300
 
     private var monitors: [Any] = []
     private var tapTimes: [Date] = []
@@ -60,22 +56,6 @@ final class EmergencyUnlock {
         }
         monitors = [flagMonitor, keyMonitor].compactMap { $0 }
         Log.write("[비상] Command \(Self.requiredTaps)번 연타 감지 시작")
-    }
-
-    /// 모니터가 조용히 죽는 경우에 대비한 자가 치유.
-    ///
-    /// 전역 이벤트 모니터는 객체가 살아 있어도 실제로는 이벤트를 못 받는 상태가
-    /// 될 수 있다. `isRunning` 은 객체 유무만 보므로 그것을 잡아내지 못한다.
-    /// 오랫동안 아무 이벤트도 못 봤다면 붙였다 떼서 되살린다. 재등록은 값이
-    /// 싸므로 사용자가 자리를 비워 조용했던 경우에 걸려도 손해가 없다.
-    func restartIfStale() {
-        guard isRunning, isTrusted else { return }
-        guard Date().timeIntervalSince(lastEventAt) > Self.staleThreshold else { return }
-        Log.write("[비상] 오랫동안 입력 이벤트가 없어 감지기를 재등록한다")
-        lastEventAt = Date()
-        let preserved = tapTimes   // 재등록 때문에 세던 카운트를 잃지 않는다
-        start()
-        tapTimes = preserved
     }
 
     func stop() {
