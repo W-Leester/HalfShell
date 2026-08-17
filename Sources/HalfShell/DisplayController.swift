@@ -101,7 +101,9 @@ final class DisplayController: ObservableObject {
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil, queue: .main
         ) { [weak self] _ in
-            Log.write("[AppKit] 화면 구성 변경 알림")
+            // 이 알림은 Dock 이 숨거나 전체화면 전환만 해도 온다 — 오늘 하루
+            // 153회 중 실제 디스플레이 변화는 36회뿐이었다. 판단 계기로는 쓰되
+            // 기록하지는 않는다. 실제 변화는 안전망이 남긴다.
             MainActor.assumeIsolated { self?.handleReconfiguration() }
         }
 

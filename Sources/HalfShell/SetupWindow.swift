@@ -76,7 +76,7 @@ private struct SetupView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("HalfShell").font(.title2).bold()
-                Text("버전 \(UpdateCheck.currentVersion) (빌드 \(UpdateCheck.buildNumber))")
+                Text("버전 \(UpdateCheck.currentVersion)")
                     .font(.callout).foregroundStyle(.secondary)
             }
             Text("뚜껑을 연 채로 내장 디스플레이만 끄고 외장만 사용합니다.\n"
@@ -143,14 +143,18 @@ private struct SetupView: View {
     private var troubleshooting: some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("문제가 생겼다면").font(.callout).bold()
-                Text("디스플레이 변화와 복구 시도가 모두 기록됩니다.\n"
-                    + "신고하실 때 이 파일을 함께 보내주시면 원인을 찾을 수 있습니다.")
+                Text("오류 신고").font(.callout).bold()
+                Text("환경 정보와 최근 기록을 채운 신고서가 브라우저에 열립니다.\n"
+                    + "내용을 확인하신 뒤 보내주세요. 자동으로 전송하지 않습니다.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
-            Button("로그 열기") { NSWorkspace.shared.open(Log.fileURL) }
+            VStack(alignment: .trailing, spacing: 4) {
+                Button("오류 신고하기") { IssueReport.openIssuePage() }
+                Button("로그 열기") { NSWorkspace.shared.open(Log.fileURL) }
+                    .buttonStyle(.link).font(.caption)
+            }
         }
     }
 
