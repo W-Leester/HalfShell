@@ -4,7 +4,7 @@ import SwiftUI
 /// 현재 설정을 한눈에 보여주는 창.
 ///
 /// 이 앱은 메뉴바에만 존재해서 상태를 파악하기 어렵다. 특히 **손쉬운 사용 권한은
-/// 안 켜두면 비상 탈출이 조용히 죽는다.** 실제로 그 상태에서 검은 화면을 만나
+/// 안 켜두면 화면 복구 단축키가 조용히 죽는다.** 실제로 그 상태에서 검은 화면을 만나
 /// 강제 재부팅까지 간 적이 있다(장애 기록 사건 3-B).
 ///
 /// 값을 바꾸는 곳은 메뉴바다. 여기서는 **보여주기만 한다** — 같은 설정을 두 곳에서
@@ -112,7 +112,7 @@ private struct SetupView: View {
                 Image(systemName: controller.accessibilityTrusted
                       ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                     .foregroundStyle(controller.accessibilityTrusted ? .green : .orange)
-                Text("비상 탈출 — Command 키 5번 연타").bold()
+                Text("화면 복구 단축키 — Command 5번 연타").bold()
                 Spacer()
                 Text(controller.accessibilityTrusted ? "준비됨" : "작동 안 함")
                     .font(.callout)

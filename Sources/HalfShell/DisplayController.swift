@@ -60,13 +60,6 @@ final class DisplayController: ObservableObject {
         didSet { applyLaunchAtLogin() }
     }
 
-    /// Command 연타 비상 탈출 사용 여부.
-    @Published var emergencyUnlockEnabled: Bool {
-        didSet {
-            UserDefaults.standard.set(emergencyUnlockEnabled, forKey: Self.emergencyKey)
-            applyEmergencyUnlock(requestingPermission: emergencyUnlockEnabled != oldValue)
-        }
-    }
     /// 손쉬운 사용 권한 상태. 시스템 설정에서 바뀌므로 워치독이 주기적으로 갱신한다.
     @Published private(set) var accessibilityTrusted = false
 
@@ -76,7 +69,6 @@ final class DisplayController: ObservableObject {
     var isUsable: Bool { skyLightAvailable && hasBuiltinDisplay }
 
     private static let autoModeKey = "autoMode"
-    private static let emergencyKey = "emergencyUnlockEnabled"
     private static let emergencyPromptedKey = "emergencyPermissionPrompted"
     /// 재구성 콜백이 실제 감지를 담당하므로 이 폴링은 예비 수단이다. 넉넉하게 둔다.
     private static let watchdogInterval: TimeInterval = 5
@@ -102,9 +94,6 @@ final class DisplayController: ObservableObject {
     private init() {
         autoMode = UserDefaults.standard.bool(forKey: Self.autoModeKey)
         launchAtLogin = SMAppService.mainApp.status == .enabled
-        // 비상 탈출은 기본값 켜짐. 한 번이라도 화면을 잃으면 메뉴에 접근할 수 없으므로
-        // 사용자가 미리 켜두기를 기대하기보다 기본으로 제공하는 편이 안전하다.
-        emergencyUnlockEnabled = UserDefaults.standard.object(forKey: Self.emergencyKey) as? Bool ?? true
 
         CGDisplayRegisterReconfigurationCallback(displayReconfigured, nil)
 
@@ -192,13 +181,10 @@ final class DisplayController: ObservableObject {
         emergencyUnlock?.requestPermission()
     }
 
+    /// 화면 복구 단축키는 **끌 수 없다.** 화면을 잃었을 때 손만으로 빠져나올 수 있는
+    /// 유일한 수단이라, 사용자가 실수로 꺼둘 여지를 두지 않는다.
     private func applyEmergencyUnlock(requestingPermission: Bool) {
         guard let emergencyUnlock else { return }
-        guard emergencyUnlockEnabled else {
-            emergencyUnlock.stop()
-            refreshAccessibilityStatus()
-            return
-        }
         if requestingPermission, !emergencyUnlock.isTrusted {
             emergencyUnlock.requestPermission()
         }
@@ -211,9 +197,9 @@ final class DisplayController: ObservableObject {
         let trusted = emergencyUnlock.isTrusted
         if accessibilityTrusted != trusted { accessibilityTrusted = trusted }
         // 권한을 나중에 허용했다면 그때 모니터를 붙인다.
-        if emergencyUnlockEnabled, trusted, !emergencyUnlock.isRunning {
+        if trusted, !emergencyUnlock.isRunning {
             emergencyUnlock.start()
-        } else if emergencyUnlockEnabled, trusted {
+        } else if trusted {
             emergencyUnlock.restartIfStale()
         }
     }

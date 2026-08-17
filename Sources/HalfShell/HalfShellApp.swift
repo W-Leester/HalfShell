@@ -35,10 +35,11 @@ struct HalfShellApp: App {
 
             Divider()
 
-            Toggle("비상 탈출: Command \(EmergencyUnlock.requiredTaps)번 연타",
-                   isOn: $controller.emergencyUnlockEnabled)
-            if controller.emergencyUnlockEnabled, !controller.accessibilityTrusted {
-                Text("작동 안 함 — 개인정보 보호 및 보안 → 손쉬운 사용에서 허용 필요")
+            // 끌 수 없는 기능이므로 토글이 아니라 안내로 둔다.
+            if controller.accessibilityTrusted {
+                Text("화면 복구: Command \(EmergencyUnlock.requiredTaps)번 연타")
+            } else {
+                Text("화면 복구 단축키 작동 안 함 — 손쉬운 사용 권한 필요")
             }
 
             Divider()
