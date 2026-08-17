@@ -19,7 +19,7 @@
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>SentryDSN</key>
-	<string></string>
+	<string>https://5399d2bcb85490ca01628f17e9dd49e0@o4511926029844480.ingest.us.sentry.io/4511926275342336</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>13.0</string>
 	<key>LSUIElement</key>
