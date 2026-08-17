@@ -105,7 +105,12 @@ struct SkyLight {
             throw Failure.configureFailed(configureStatus)
         }
 
+        // 커밋이 얼마나 걸렸는지 재둔다. 실패하는 커밋이 약 10초를 잡는 것을
+        // 실측했고, 그것이 반복되면 배터리를 태운다.
+        let startedAt = Date()
         let commitStatus = complete(config, scope.rawValue)
+        Telemetry.noteSlowCommit(enabled ? "enable" : "disable",
+                                 seconds: Date().timeIntervalSince(startedAt))
         guard commitStatus == 0 else { throw Failure.commitFailed(commitStatus) }
     }
 }

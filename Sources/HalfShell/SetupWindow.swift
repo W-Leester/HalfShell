@@ -145,14 +145,14 @@ private struct SetupView: View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("오류 신고").font(.callout).bold()
-                Text("환경 정보와 최근 기록을 채운 신고서가 브라우저에 열립니다.\n"
-                    + "내용을 확인하신 뒤 보내주세요. 자동으로 전송하지 않습니다.")
+                Text("무슨 일이 있었는지 적어 바로 보낼 수 있습니다.\n"
+                    + "함께 나가는 정보를 보내기 전에 확인하실 수 있습니다.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Button("오류 신고하기") { IssueReport.openIssuePage() }
+                Button("오류 신고하기") { ReportWindowController.shared.show() }
                 Button("로그 열기") { NSWorkspace.shared.open(Log.fileURL) }
                     .buttonStyle(.link).font(.caption)
             }

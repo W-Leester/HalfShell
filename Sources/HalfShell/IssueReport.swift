@@ -15,11 +15,25 @@ enum IssueReport {
     /// URL 길이에는 현실적인 한계가 있어 로그는 최근 것만 싣는다.
     private static let logTailLines = 40
 
-    static func compose() -> String {
+    /// 사용자가 "무엇이 함께 나가는지" 볼 수 있어야 한다. 신고 창에서 그대로 보여준다.
+    static func diagnosticsOnly() -> String {
+        [
+            "HalfShell \(UpdateCheck.currentVersion)",
+            ProcessInfo.processInfo.operatingSystemVersionString,
+            hardwareModel(),
+            "디스플레이: \(displaySummary())",
+            "",
+            recentLog(),
+        ].joined(separator: "\n")
+    }
+
+    static func compose(userText: String = "") -> String {
         var lines: [String] = []
         lines.append("## 무슨 일이 있었나요")
         lines.append("")
-        lines.append("(여기에 상황을 적어주세요. 예: 독을 뽑고 뚜껑을 열었더니 화면이 검은 채였습니다)")
+        lines.append(userText.isEmpty
+            ? "(여기에 상황을 적어주세요. 예: 독을 뽑고 뚜껑을 열었더니 화면이 검은 채였습니다)"
+            : userText)
         lines.append("")
         lines.append("## 환경")
         lines.append("")
@@ -36,11 +50,11 @@ enum IssueReport {
         return lines.joined(separator: "\n")
     }
 
-    static func openIssuePage() {
+    static func openIssuePage(userText: String = "") {
         var components = URLComponents(string: issueBase)!
         components.queryItems = [
             URLQueryItem(name: "title", value: "[신고] "),
-            URLQueryItem(name: "body", value: compose()),
+            URLQueryItem(name: "body", value: compose(userText: userText)),
         ]
         guard let url = components.url else { return }
         NSWorkspace.shared.open(url)
