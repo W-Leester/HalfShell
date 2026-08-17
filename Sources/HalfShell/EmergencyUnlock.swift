@@ -18,7 +18,7 @@ import Foundation
 @MainActor
 final class EmergencyUnlock {
     static let requiredTaps = 5
-    static let window: TimeInterval = 3
+    static let window: TimeInterval = 4
     /// 이 시간 동안 입력 이벤트를 하나도 못 보면 모니터가 죽은 것으로 보고 재등록한다.
     /// 자리를 비우면 몇 분씩 조용한 것이 정상이므로 넉넉하게 잡는다. 짧게 잡으면
     /// 멀쩡한 모니터를 계속 붙였다 뗐다 하면서 오히려 이벤트를 놓칠 수 있다.
@@ -55,9 +55,8 @@ final class EmergencyUnlock {
         let flagMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
             MainActor.assumeIsolated { self?.handleFlagsChanged(event) }
         }
-        // 다른 키가 눌리면 "단독 연타"가 아니므로 처음부터 다시 센다.
         let keyMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { [weak self] _ in
-            MainActor.assumeIsolated { self?.noteReset(reason: "다른 키 입력") }
+            MainActor.assumeIsolated { self?.noteKeyDown() }
         }
         monitors = [flagMonitor, keyMonitor].compactMap { $0 }
         Log.write("[비상] Command \(Self.requiredTaps)번 연타 감지 시작")
@@ -99,7 +98,8 @@ final class EmergencyUnlock {
     private func handleFlagsChanged(_ event: NSEvent) {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
-        if Date() < diagnosticUntil, diagnosticCount < 60 {
+        if Date() < diagnosticUntil, diagnosticCount < 60,
+           flags.contains(.command) || !tapTimes.isEmpty {
             diagnosticCount += 1
             Log.write("[비상·진단] flagsChanged 수신 flags=\(flags.rawValue) "
                 + "cmd=\(flags.contains(.command)) 직전눌림=\(commandWasDown) 카운트=\(tapTimes.count)")
@@ -150,6 +150,18 @@ final class EmergencyUnlock {
         resetCount()
         Log.write("[비상] Command 연타 감지 → 내장 디스플레이 복구")
         onTrigger()
+    }
+
+    /// 다른 키가 눌렸을 때.
+    ///
+    /// **Command 를 누른 채로 눌린 키만 카운트를 버린다.** 그것이 단축키(Cmd+C 등)이고
+    /// 오발을 막아야 하는 대상이다. 반면 Command 를 뗀 사이에 들어온 키는 연타와
+    /// 무관하다 — 당황해서 두드릴 때 손이 다른 키를 스치는 것까지 실패로 처리하면
+    /// 정작 필요한 순간에 안 걸린다. 실측 로그에서 이것 때문에 3회까지 센 카운트가
+    /// 버려지는 것을 확인했다.
+    private func noteKeyDown() {
+        guard commandWasDown else { return }
+        noteReset(reason: "Command 와 함께 다른 키")
     }
 
     /// 세고 있던 중에 끊겼을 때만 기록한다. 평상시에는 로그를 채우지 않는다.
