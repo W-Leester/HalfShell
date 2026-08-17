@@ -270,6 +270,12 @@ final class DisplayController: ObservableObject {
         }
         guard attemptsLeft > 0 else {
             Log.write("[시스템] 내장 복구 재시도를 모두 소진했다")
+            // 화면이 검은 채로 남았다는 뜻이다. 사용자는 이 순간 신고할 방법이 없다.
+            Telemetry.report("깨어난 뒤 내장 디스플레이 복구 실패", extra: [
+                "activeDisplays": DisplayInfo.activeDisplays().sorted().description,
+                "realDisplays": DisplayInfo.realActiveDisplays().sorted().description,
+                "autoMode": autoMode,
+            ])
             return
         }
         enableBuiltin()

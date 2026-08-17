@@ -156,6 +156,13 @@ final class SafetyNet {
                 return
             }
             consecutiveFailures += 1
+            if consecutiveFailures == 5 {
+                Telemetry.report("안전망 복구가 연속 실패 — 최후 방어선 무너짐", extra: [
+                    "activeDisplays": all.sorted().description,
+                    "target": Int(target),
+                    "error": error.localizedDescription,
+                ])
+            }
             let backoff = min(pow(2, Double(consecutiveFailures)), Self.maxBackoff)
             retryNotBefore = Date().addingTimeInterval(backoff)
             Log.write("[안전망] 복구 실패(\(consecutiveFailures)회): \(error.localizedDescription) "

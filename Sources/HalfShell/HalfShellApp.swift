@@ -48,7 +48,7 @@ struct HalfShellApp: App {
             if let version = updates.availableVersion {
                 Button("새 버전 \(version) 받기…") { updates.openReleasesPage() }
             }
-            Button("현재 설정 보기") { SetupWindowController.shared.show() }
+            Button("HalfShell 정보 보기") { SetupWindowController.shared.show() }
 
             Divider()
 
@@ -80,6 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             reason: "디스플레이 상태 감시"
         )
 
+        Telemetry.start()
         Log.startSession("HalfShell \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "?")")
         SafetyNet.shared.start()
         _ = DisplayController.shared

@@ -63,6 +63,7 @@ private struct SetupView: View {
             }
 
             Divider()
+            telemetrySection
             troubleshooting
             Divider()
             footer
@@ -154,6 +155,22 @@ private struct SetupView: View {
                 Button("오류 신고하기") { IssueReport.openIssuePage() }
                 Button("로그 열기") { NSWorkspace.shared.open(Log.fileURL) }
                     .buttonStyle(.link).font(.caption)
+            }
+        }
+    }
+
+    /// 남의 기기에서 나가는 자료이므로 끌 수 있어야 하고, 무엇이 나가는지 밝혀야 한다.
+    @ViewBuilder private var telemetrySection: some View {
+        if Telemetry.isConfigured {
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle("오류 보고서 자동 전송", isOn: Binding(
+                    get: { Telemetry.isEnabled },
+                    set: { Telemetry.isEnabled = $0; $0 ? Telemetry.start() : Telemetry.stop() }
+                ))
+                Text("화면 복구에 실패했을 때만 보냅니다. 앱 버전, macOS 버전, 기종, "
+                    + "그때의 디스플레이 구성이 담깁니다.\n로그 본문이나 신원 정보는 보내지 않습니다.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

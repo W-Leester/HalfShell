@@ -55,7 +55,17 @@ struct SkyLight {
     private let complete: CompleteFn
     private let cancel: CancelFn?
 
-    static let shared: SkyLight? = SkyLight()
+    static let shared: SkyLight? = {
+        let instance = SkyLight()
+        if instance == nil {
+            // macOS 업데이트로 Apple 이 심볼을 치웠다는 뜻이다. 사용자 신고를
+            // 기다리면 늦다. 이 신호로 즉시 알 수 있다.
+            Telemetry.report("SkyLight 심볼을 찾지 못함 — 기능 사용 불가", extra: [
+                "os": ProcessInfo.processInfo.operatingSystemVersionString,
+            ])
+        }
+        return instance
+    }()
 
     private init?() {
         guard let handle = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY) else {

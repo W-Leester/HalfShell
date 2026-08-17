@@ -362,7 +362,7 @@ ID 도 그 플래그가 true 라는 것을 **이미 알고 있었으면서** 넣
 > | powerlog DB | **약 2일** | 프로세스별 CPU·에너지 |
 > | 통합 로그(`log show`) | 권한 문제로 사실상 조회 불가 | — |
 
-**1. 앱 로그부터 본다.** `~/Library/Logs/HalfShell.log` (메뉴바 → 현재 설정 보기 → 로그 열기)
+**1. 앱 로그부터 본다.** `~/Library/Logs/HalfShell.log` (메뉴바 → HalfShell 정보 보기 → 로그 열기)
 직전 세대는 `HalfShell.log.1` 에 남는다.
 
 ```sh
