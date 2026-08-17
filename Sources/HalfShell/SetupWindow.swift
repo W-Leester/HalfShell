@@ -143,13 +143,7 @@ private struct SetupView: View {
     /// 이름에 목적을 드러내야 무엇에 쓰는 것인지 알 수 있다.
     private var troubleshooting: some View {
         HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("오류 신고").font(.callout).bold()
-                Text("무슨 일이 있었는지 적어 바로 보낼 수 있습니다.\n"
-                    + "함께 나가는 정보를 보내기 전에 확인하실 수 있습니다.")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text("오류 신고").font(.callout).bold()
             Spacer()
             Button("오류 신고하기") { ReportWindowController.shared.show() }
         }
