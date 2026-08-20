@@ -165,11 +165,18 @@ final class DisplayController: ObservableObject {
     /// 마지막 수단이므로, `evaluate()` 의 판단(활성 목록이 비면 잠자기로 보고 손을
     /// 떼는 등)이 어떤 이유로든 막히면 탈출까지 함께 막혀 버린다.
     /// 자동 모드도 함께 끈다. 켜기만 하면 규칙 3이 곧바로 다시 꺼버리기 때문이다.
+    ///
+    /// **켜는 것이 먼저다.** 반대 순서(`autoMode = false` 먼저)로 두면 didSet 의
+    /// `evaluate()` 가 그 자리에서 규칙 2로 먼저 켜 버리고, 이 함수의 켜기는 이미
+    /// 켜진 디스플레이에 대한 중복 커밋이 되어 실패한다(실측 13/13회, 코드 1001).
+    /// 실패 자체는 무해했지만 메뉴에 가짜 오류가 뜨고 로그가 거짓을 말했다.
+    /// 켜고 나서 자동 모드를 끄면 evaluate() 는 켜진 상태를 보므로 규칙 2 조건이
+    /// 성립하지 않는다 — 커밋 직후 CG 목록이 갱신되어 있음은 실측으로 확인했다.
     func manualEnable() {
         manuallyDisabled = false
         Log.write("[조작] 수동 켜기")
-        autoMode = false
         enableBuiltin(force: true)
+        autoMode = false
     }
 
     /// Command 연타로 발동하는 비상 복구.
@@ -411,6 +418,16 @@ final class DisplayController: ObservableObject {
             lastError = nil
             Log.write("[동작] 내장(id=\(id)) 켬. active=\(DisplayInfo.activeDisplays().sorted())")
         } catch {
+            // 다른 경로가 먼저 켰다면 이 트랜잭션은 밀려서 실패한다(이미 켜진
+            // 디스플레이에 대한 켜기 커밋도 1001 로 실패한다 — 실측). 화면이
+            // 실제로 켜져 있는지부터 확인해야 로그와 메뉴가 사실을 말한다.
+            // 안전망의 중복 시도 처리와 같은 방식이다.
+            if DisplayInfo.activeDisplays().contains(id) {
+                builtinOff = false
+                lastError = nil
+                Log.write("[동작] 이미 켜져 있음(중복 시도)")
+                return
+            }
             lastError = error.localizedDescription
             Log.write("[동작] 내장 켜기 실패: \(error.localizedDescription)")
         }
