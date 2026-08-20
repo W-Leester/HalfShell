@@ -85,6 +85,9 @@ final class DisplayController: ObservableObject {
     private var manuallyDisabled = false
     /// 자동 끄기 무장 상태. 깨어난 직후에는 해제된다 — ``handleWake()`` 참고.
     private var autoDisableArmed = true
+
+    /// 직전에 관찰한 뚜껑 상태. 워치독이 2초마다 도므로 바뀔 때만 로그를 남긴다.
+    private var lidClosedLast = false
     private var lastWakeAt = Date.distantPast
     private var pendingEvaluation: DispatchWorkItem?
     private var watchdog: Timer?
@@ -166,7 +169,7 @@ final class DisplayController: ObservableObject {
         manuallyDisabled = false
         Log.write("[조작] 수동 켜기")
         autoMode = false
-        enableBuiltin()
+        enableBuiltin(force: true)
     }
 
     /// Command 연타로 발동하는 비상 복구.
@@ -332,6 +335,15 @@ final class DisplayController: ObservableObject {
         let isOff = !active.contains(builtin)
         if builtinOff != isOff { builtinOff = isOff }
 
+        // 뚜껑이 닫혀 있으면 내장이 꺼져 있는 것이 **정상**이다. 그게 클램쉘이다.
+        // 이 구분이 없어서 규칙 2가 뚜껑 닫기를 "남이 껐다"로 오인하고 매번
+        // 되돌렸다(사건 5). 아래 규칙 1·2는 뚜껑이 열려 있을 때만 의미가 있다.
+        let lidClosed = LidState.isClosed
+        if lidClosed != lidClosedLast {
+            lidClosedLast = lidClosed
+            Log.write("[뚜껑] \(lidClosed ? "닫힘 — 내장이 꺼진 것은 정상이므로 손대지 않는다" : "열림")")
+        }
+
         if externals.isEmpty {
             // 외장이 하나도 없는 상태를 지나갔다면, 다음에 붙는 것은 진짜 연결이다.
             if !autoDisableArmed {
@@ -339,14 +351,16 @@ final class DisplayController: ObservableObject {
                 Log.write("[자동] 외장 0개 확인 → 자동 끄기 재무장")
             }
             // 규칙 1: 외장이 없으면 무조건 켠다.
-            if isOff {
+            // 뚜껑이 닫혀 있고 외장도 없다면 곧 잠자기로 들어간다. 그때 켜려 들면
+            // 잠자기를 방해하며 전력만 태운다(사건 2와 같은 모양).
+            if isOff, !lidClosed {
                 Log.write("[규칙1] 외장 0개 + 내장 꺼짐 → 복구")
                 enableBuiltin()
             }
         } else if autoMode {
             // 규칙 3. 단, 깨어난 직후 관찰만으로는 끄지 않는다(handleWake 참고).
             if !isOff, autoDisableArmed { disableBuiltin() }
-        } else if isOff, !manuallyDisabled {
+        } else if isOff, !manuallyDisabled, !lidClosed {
             // 규칙 2: 자동 모드가 꺼져 있는데 내장이 꺼져 있다 → 자가 치유
             Log.write("[규칙2] 자동 모드 꺼짐 + 내장 꺼짐 → 자가 치유")
             enableBuiltin()
@@ -372,7 +386,23 @@ final class DisplayController: ObservableObject {
         }
     }
 
-    private func enableBuiltin() {
+    /// 내장 디스플레이를 켠다.
+    ///
+    /// - Parameter force: 사용자가 직접 지시한 경로인가. 뚜껑 검사를 건너뛴다.
+    ///
+    /// **뚜껑이 닫혀 있으면 켜지 않는다(사건 5).** 닫힌 패널을 논리적으로 켜 봐야
+    /// 사용자에게 보이는 것은 없고, 창만 보이지 않는 화면으로 끌려가며 잠자기까지
+    /// 방해한다. 사건 2의 배터리 방전이 정확히 그 모양이었다.
+    ///
+    /// 켜는 경로가 여섯 군데라 각자 검사하게 두면 언젠가 하나를 빠뜨린다.
+    /// 그래서 관문을 하나로 모았다. 단, 사용자가 명시적으로 누른 경로(`manualEnable`,
+    /// 화면 복구 단축키)만은 통과시킨다 — 상태 판단이 어떤 이유로든 어긋났을 때
+    /// 탈출까지 함께 막히면 안 된다.
+    private func enableBuiltin(force: Bool = false) {
+        if !force, LidState.isClosed {
+            Log.write("[뚜껑] 닫힌 상태 — 내장 켜기를 건너뛴다(클램쉘 유지)")
+            return
+        }
         guard let skyLight = SkyLight.shared, let id = builtinDisplayID else { return }
         do {
             // session: appOnly 로 켜면 이 프로세스가 끝날 때 도로 꺼진다.

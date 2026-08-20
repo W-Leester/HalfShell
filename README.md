@@ -26,6 +26,34 @@
    이전 인스턴스가 크래시했거나 다른 앱(Lunar 등)이 꺼둔 상태를 자가 치유한다.
 3. 자동 모드 + 외장 존재 → 내장을 끈다. **단, 무장 상태일 때만.**
 
+**뚜껑이 닫혀 있으면 위 규칙 1·2 는 적용하지 않는다.** 뚜껑을 닫아서 내장이 꺼진
+것은 정상적인 클램쉘이지 고쳐야 할 상태가 아니다.
+
+### 뚜껑을 닫으면 (클램쉘)
+
+평범하게 클램쉘로 들어간다. 이 앱은 아무것도 하지 않는다.
+
+내장 디스플레이가 꺼지는 이유는 네 가지인데, macOS 가 주는 재구성 알림만으로는
+서로 구분되지 않는다 — 뚜껑을 닫아서 꺼진 것과 다른 앱이 끈 것이 **완전히 같은
+모양**으로 보인다. 그래서 `IOPMrootDomain` 의 `AppleClamshellState` 를 따로 읽어
+구분한다. 터미널에서도 같은 값을 볼 수 있다.
+
+```sh
+ioreg -r -k AppleClamshellState -d 4 | grep AppleClamshellState
+#   "AppleClamshellState" = No     ← 열림
+```
+
+이 구분이 없던 동안에는 뚜껑을 닫아도 앱이 내장을 계속 되살려서 클램쉘로 들어가지
+못했다(사건 5). 보이지 않는 화면이 배치에 남아 **창이 그쪽으로 끌려가는** 문제가
+있었다.
+
+값을 읽지 못하면 **"열림"으로 간주한다.** 반대로 틀리면 화면 복구가 막혀 사용자가
+검은 화면에 갇히기 때문이다. 뚜껑이 없는 Mac(mini·Studio·Pro)에는 이 값 자체가
+없으므로 자연히 "열림"이 된다.
+
+**화면 복구 단축키와 메뉴의 "내장 디스플레이 켜기"는 이 검사를 건너뛴다.**
+상태 판단이 어떤 이유로든 어긋났을 때 탈출까지 함께 막히면 안 되기 때문이다.
+
 ### 잠자기·깨어남에서의 예외
 
 잠들기 직전에 내장을 되돌려 놓고, **깨어난 직후에는 관찰만으로 내장을 다시 끄지
@@ -331,19 +359,27 @@ vendor/model 이 숫자가 아니라 ASCII 4글자다 — `0x756E6B6E` = `"unkn"
 
 ```
 Sources/HalfShell/
-  SkyLight.swift            # 비공개 API 브리지 (dlsym)
+  SkyLight.swift            # 비공개 API 브리지 (dlsym) + 커밋 시간 측정
   Displays.swift            # 디스플레이 조회 + 가상 디스플레이 판별 + 내장 ID 기억
+  LidState.swift            # 뚜껑 열림/닫힘 (AppleClamshellState)
+  DisplayController.swift   # 토폴로지 감시 + 자동 끄기/복구 상태 머신
   SafetyNet.swift           # 메인 런루프 밖에서 도는 최후 방어선
   EmergencyUnlock.swift     # Command 연타 화면 복구 단축키
-  Log.swift                 # 파일 로거
-  DisplayController.swift   # 토폴로지 감시 + 자동 끄기/복구 상태 머신
+  Log.swift                 # 파일 로거 (한 세대 회전)
   HalfShellApp.swift        # MenuBarExtra UI + 종료 시 복구
-Resources/Info.plist        # LSUIElement (메뉴바 전용 앱), 버전 정보
+  SetupWindow.swift         # "HalfShell 정보 보기" 창
+  ReportWindow.swift        # 앱 안에서 바로 보내는 오류 신고 창
+  IssueReport.swift         # 진단 정보 수집 + GitHub 이슈 초안
+  Telemetry.swift           # 오류 자동 보고 (Sentry)
+  UpdateCheck.swift         # GitHub Releases 최신 버전 조회
+  UpdateMonitor.swift       # 하루 한 번 배경 확인 → 메뉴에 알림
+Resources/Info.plist        # LSUIElement (메뉴바 전용 앱), 버전, SentryDSN
 scripts/make-icon.swift     # 앱 아이콘(.icns) 생성기
-build.sh                    # .app 번들 빌드 + 아이콘 + ad-hoc 서명
+build.sh                    # 유니버설 빌드 + 아이콘 + 코드 서명
 install.sh                  # /Applications 설치
 make-dmg.sh                 # 배포용 DMG 생성
 
+Package.resolved            # 의존성 버전 고정 — 커밋한다 (재현 가능한 빌드)
 build/                      # 빌드 산출물 (.app, .icns) — git 제외
 dist/                       # 배포용 DMG — git 제외
 ```

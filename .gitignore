@@ -1,11 +1,55 @@
 # Swift Package Manager
 .build/
 .swiftpm/
-Package.resolved
 
 # 빌드 산출물
 build/
 dist/
+*.dmg
+*.zip
+
+# ─────────────────────────────────────────────────────────────
+# 서명·공증 자격증명 — 유출되면 남이 내 이름으로 앱을 배포할 수 있다.
+# 이것들은 저장소 바깥(Keychain, 홈 디렉터리)에 두는 것이 원칙이지만,
+# 작업하다 프로젝트 폴더에 잠깐 내려받는 일이 흔해서 미리 막아둔다.
+# ─────────────────────────────────────────────────────────────
+AuthKey_*.p8
+*.p8
+*.p12
+*.pem
+*.cer
+*.certSigningRequest
+*.mobileprovision
+*.provisionprofile
+
+# 환경 변수 파일 — 토큰·DSN 등이 담기기 쉽다
+.env
+.env.*
+!.env.example
+
+# ─────────────────────────────────────────────────────────────
+# 개인 정보가 담기는 것들
+# ─────────────────────────────────────────────────────────────
+# 진단 로그. 모니터 모델·사용 시각·기기 구성이 그대로 담긴다.
+# 신고할 때 첨부하는 것과 저장소에 올리는 것은 전혀 다른 일이다.
+*.log
+HalfShell.log*
+logs/
+
+# 크래시 리포트·진단 덤프
+*.crash
+*.ips
+*.spx
+
+# 편집기·도구의 개인 설정
+.vscode/
+.idea/
+*.xcworkspace/xcuserdata/
+xcuserdata/
+.claude/settings.local.json
+
+# git-secret 이 복호화한 평문 (도입할 경우에만 의미가 있다)
+*.secret.plain
 
 # macOS
 .DS_Store

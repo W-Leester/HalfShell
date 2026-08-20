@@ -1,0 +1,15 @@
+{
+  "originHash" : "c708a4128630ccf80beaa9765cb522f10a3272821945d241f3b73f13b4ea9e3f",
+  "pins" : [
+    {
+      "identity" : "sentry-cocoa",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/getsentry/sentry-cocoa",
+      "state" : {
+        "revision" : "f196cbb98e0388381d57908f2f5a9bdc385cde68",
+        "version" : "8.58.4"
+      }
+    }
+  ],
+  "version" : 3
+}
