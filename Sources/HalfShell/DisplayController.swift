@@ -88,6 +88,21 @@ final class DisplayController: ObservableObject {
 
     /// 직전에 관찰한 뚜껑 상태. 워치독이 2초마다 도므로 바뀔 때만 로그를 남긴다.
     private var lidClosedLast = false
+
+    /// 잠들기 전환 중인가. `willSleep` 에서 서고 `didWake` 에서 내려간다.
+    ///
+    /// 이 깃발이 없어서 사건 6이 났다. 잠들기 직전 선복구가 내장을 켜자 규칙 3이
+    /// "외장 있고 내장 켜짐 → 끈다"며 잠드는 WindowServer 에 끄기 커밋을 냈고,
+    /// 그 커밋이 **메인 스레드를 17분** 붙잡았다(다음 유지보수 깨어남까지).
+    /// 잠들기 전환 중의 디스플레이 목록은 낡은 값일 수 있고, 그 순간 내린 어떤
+    /// 판단도 커밋이 잠든 WindowServer 에 붙잡힐 수 있다. 판단 자체를 쉰다.
+    ///
+    /// 시각으로 기록하는 이유: 잠들기가 **취소**되면 `didWake` 가 오지 않을 수
+    /// 있다. 불리언이면 깃발이 영영 서 있어 규칙 전체가 죽는다. 판단 중지는
+    /// 어차피 전환의 몇 초를 덮으면 충분하므로 60초가 지나면 스스로 풀린다
+    /// (진짜 잠들었다면 그 60초 동안 코드가 돌지 않으니 아무 차이가 없다).
+    private var sleepBeganAt: Date?
+    private static let sleepHoldDuration: TimeInterval = 60
     private var lastWakeAt = Date.distantPast
     private var pendingEvaluation: DispatchWorkItem?
     private var watchdog: Timer?
@@ -233,6 +248,7 @@ final class DisplayController: ObservableObject {
     /// 그래서 최선 노력으로만 던져두고, 실제 보장은 깨어난 뒤
     /// ``restoreBuiltinPersistently(attemptsLeft:)`` 가 맡는다(실측으로 27ms 만에 복구).
     private func prepareForSleep() {
+        sleepBeganAt = Date()
         Log.write("[시스템] 잠들기 — 내장 선복구 시도(실패해도 깨어날 때 복구한다)")
         guard let skyLight = SkyLight.shared, let id = builtinDisplayID else { return }
         DispatchQueue.global(qos: .userInitiated).async {
@@ -259,6 +275,7 @@ final class DisplayController: ObservableObject {
     /// 내장이 함께 켜진 상태로 남으므로, 케이블을 다시 꽂거나 메뉴에서 한 번
     /// 눌러주면 된다. 검은 화면으로 깨어나는 것보다는 낫다.
     private func handleWake() {
+        sleepBeganAt = nil
         Log.write("[시스템] 깨어남 — 내장 복구 후 자동 끄기 보류")
         autoDisableArmed = false
         lastWakeAt = Date()
@@ -277,6 +294,14 @@ final class DisplayController: ObservableObject {
         if let builtin = builtinDisplayID,
            DisplayInfo.realActiveDisplays().contains(builtin) {
             return  // 이미 켜져 있다
+        }
+        // 뚜껑이 닫혀 있으면 복구할 것이 없다 — 정상적인 클램쉘이다.
+        // 이 검사가 없어서 클램쉘 중 잠깐 깨어날 때마다 재시도 12번을 전부
+        // 뚜껑 관문에 부딪히고는 "복구 실패"라는 **거짓 경보**를 Sentry 로
+        // 보냈다(실측 2회). 진짜 사고가 양치기 신고에 묻히는 것이 가장 큰 손해다.
+        if LidState.isClosed {
+            Log.write("[시스템] 깨어남 복구 중단 — 뚜껑 닫힘(클램쉘). 복구할 것이 없다")
+            return
         }
         guard attemptsLeft > 0 else {
             Log.write("[시스템] 내장 복구 재시도를 모두 소진했다")
@@ -320,6 +345,15 @@ final class DisplayController: ObservableObject {
     }
 
     private func evaluate() {
+        // 잠들기 전환 중에는 판단하지 않는다(사건 6). 이 사이의 디스플레이 목록은
+        // 몇 초 전 값일 수 있고, 여기서 발행한 커밋은 잠든 WindowServer 에
+        // 붙잡혀 다음 깨어남까지 돌아오지 않는다. 수동/비상 켜기(force)는
+        // 이 관문을 거치지 않으므로 탈출은 막히지 않는다.
+        if let began = sleepBeganAt {
+            guard Date().timeIntervalSince(began) >= Self.sleepHoldDuration else { return }
+            sleepBeganAt = nil  // didWake 없이 잠들기가 취소된 경우 — 스스로 푼다
+        }
+
         // 활성 목록이 완전히 비어 있으면 잠자기 중이다. 이때 손대면 잠든 맥을 상대로
         // 복구를 반복하게 된다(커밋이 10초씩 블로킹되므로 전력 손실이 크다).
         // 진짜 위험 상황에서는 macOS 가 가상 디스플레이를 만들어 목록이 비지 않는다.
