@@ -277,6 +277,11 @@ final class DisplayController: ObservableObject {
     private func handleWake() {
         sleepBeganAt = nil
         Log.write("[시스템] 깨어남 — 내장 복구 후 자동 끄기 보류")
+        // 유령 판별 실험: 깨어나는 순간이 유령이 태어나는 순간이므로,
+        // 이때의 두 장부(화면 목록 vs 물리 링크)를 반드시 대조해 남긴다.
+        let cgExternals = DisplayInfo.activeDisplays().filter { CGDisplayIsBuiltin($0) == 0 }
+        Log.write("[진단] 깨어남 대조 — 목록외장=\(cgExternals.sorted()) "
+            + "\(PhysicalLink.describe()) 뚜껑=\(LidState.isClosed ? "닫힘" : "열림")")
         autoDisableArmed = false
         lastWakeAt = Date()
         restoreBuiltinPersistently(attemptsLeft: Self.wakeRestoreAttempts)

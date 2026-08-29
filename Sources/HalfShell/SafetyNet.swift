@@ -98,7 +98,10 @@ final class SafetyNet {
                 + " v=\(CGDisplayVendorNumber(id)) m=\(CGDisplayModelNumber(id))"
                 + " builtin=\(CGDisplayIsBuiltin(id) != 0))"
         }.joined(separator: " ")
-        let signature = "active=\(all.sorted()) 실제=\(real.sorted()) [\(detail)]"
+        // 화면 목록(A 장부) 옆에 물리 링크(B 장부)를 나란히 적는다 — 유령 판별
+        // 실험의 데이터 수집이다. 서명에 포함시키므로 케이블만 뽑히고 목록이
+        // 낡은 채 남는 순간(사건 6의 전환기)도 B 쪽 변화로 기록이 남는다.
+        let signature = "active=\(all.sorted()) 실제=\(real.sorted()) [\(detail)] \(PhysicalLink.describe())"
         if signature != lastSignature {
             lastSignature = signature
             Log.write("[안전망] \(signature)")
