@@ -280,8 +280,16 @@ final class DisplayController: ObservableObject {
         // 유령 판별 실험: 깨어나는 순간이 유령이 태어나는 순간이므로,
         // 이때의 두 장부(화면 목록 vs 물리 링크)를 반드시 대조해 남긴다.
         let cgExternals = DisplayInfo.activeDisplays().filter { CGDisplayIsBuiltin($0) == 0 }
-        Log.write("[진단] 깨어남 대조 — 목록외장=\(cgExternals.sorted()) "
+        Log.write("[진단] 깨어남 대조(즉시) — 목록외장=\(cgExternals.sorted()) "
             + "\(PhysicalLink.describe()) 뚜껑=\(LidState.isClosed ? "닫힘" : "열림")")
+        // 깨어나는 순간의 DCP 는 아직 안 올라와 있다(실측: 0.9초 뒤 복귀). 즉시
+        // 조회만 남기면 정작 필요한 시점의 데이터가 "준비중"으로 비어 버리므로,
+        // 장부가 준비된 뒤의 값도 함께 남긴다. 관측 전용이라 동작에는 영향이 없다.
+        PhysicalLink.readWhenReady { reading in
+            let settled = DisplayInfo.activeDisplays().filter { CGDisplayIsBuiltin($0) == 0 }
+            Log.write("[진단] 깨어남 대조(안정) — 목록외장=\(settled.sorted()) "
+                + "물리링크=\(reading.text) 뚜껑=\(LidState.isClosed ? "닫힘" : "열림")")
+        }
         autoDisableArmed = false
         lastWakeAt = Date()
         restoreBuiltinPersistently(attemptsLeft: Self.wakeRestoreAttempts)
