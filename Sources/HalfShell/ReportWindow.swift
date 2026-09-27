@@ -17,7 +17,7 @@ final class ReportWindowController: NSObject, NSWindowDelegate {
         if window == nil {
             let hosting = NSHostingController(rootView: ReportView())
             let w = NSWindow(contentViewController: hosting)
-            w.title = "오류 신고"
+            w.title = NSLocalizedString("오류 신고", comment: "신고 창 제목")
             w.styleMask = [.titled, .closable]
             w.isReleasedWhenClosed = false
             w.delegate = self
@@ -64,8 +64,7 @@ private struct ReportView: View {
                     .foregroundStyle(.green)
             } else if !canSendInApp {
                 // 자동 전송이 꺼져 있으면 앱이 대신 보낼 수 없다. 브라우저 경로로 안내한다.
-                Text("오류 보고서 자동 전송이 꺼져 있어 앱에서 바로 보낼 수 없습니다.\n"
-                    + "브라우저로 신고하거나, HalfShell 정보 창에서 자동 전송을 켜주세요.")
+                Text("오류 보고서 자동 전송이 꺼져 있어 앱에서 바로 보낼 수 없습니다.\n브라우저로 신고하거나, HalfShell 정보 창에서 자동 전송을 켜주세요.")
                     .font(.caption).foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }

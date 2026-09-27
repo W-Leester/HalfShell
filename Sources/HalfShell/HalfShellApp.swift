@@ -59,7 +59,9 @@ struct HalfShellApp: App {
         }
     }
 
-    private var statusLine: String {
+    // String 을 돌려주면 Text(_: String) 이 잡혀서 번역이 되지 않는다.
+    // LocalizedStringKey 여야 Localizable.strings 를 거친다.
+    private var statusLine: LocalizedStringKey {
         if controller.builtinOff { return "내장 디스플레이: 꺼짐" }
         return controller.externalConnected ? "외장 디스플레이: 연결됨" : "외장 디스플레이: 없음"
     }

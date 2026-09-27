@@ -8,6 +8,10 @@
 	<string>HalfShell</string>
 	<key>CFBundleIdentifier</key>
 	<string>dev.leester.halfshell</string>
+	<!-- 기본 언어. 지원 언어 목록은 Resources 의 ko.lproj / en.lproj 가
+	     선언하므로 CFBundleLocalizations 는 두지 않는다(중복 집계된다). -->
+	<key>CFBundleDevelopmentRegion</key>
+	<string>ko</string>
 	<key>CFBundleExecutable</key>
 	<string>HalfShell</string>
 	<key>CFBundleIconFile</key>

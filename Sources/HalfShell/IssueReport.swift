@@ -11,6 +11,10 @@ import Foundation
 /// 서버가 필요 없다는 이점도 있다. GitHub 이슈 작성 화면에 제목과 본문을 미리
 /// 채워 넣는 것만으로 신고 경로가 완성된다.
 enum IssueReport {
+    /// SwiftUI 바깥이라 리터럴이 자동으로 번역되지 않는다. 짧게 감싼다.
+    private static func L(_ key: String) -> String {
+        NSLocalizedString(key, comment: "오류 신고서")
+    }
     private static let issueBase = "https://github.com/W-Leester/HalfShell/issues/new"
     /// URL 길이에는 현실적인 한계가 있어 로그는 최근 것만 싣는다.
     private static let logTailLines = 40
@@ -21,7 +25,7 @@ enum IssueReport {
             "HalfShell \(UpdateCheck.currentVersion)",
             ProcessInfo.processInfo.operatingSystemVersionString,
             hardwareModel(),
-            "디스플레이: \(displaySummary())",
+            L("디스플레이: ") + displaySummary(),
             "",
             recentLog(),
         ].joined(separator: "\n")
@@ -29,20 +33,20 @@ enum IssueReport {
 
     static func compose(userText: String = "") -> String {
         var lines: [String] = []
-        lines.append("## 무슨 일이 있었나요")
+        lines.append(L("## 무슨 일이 있었나요"))
         lines.append("")
         lines.append(userText.isEmpty
-            ? "(여기에 상황을 적어주세요. 예: 독을 뽑고 뚜껑을 열었더니 화면이 검은 채였습니다)"
+            ? L("(여기에 상황을 적어주세요. 예: 독을 뽑고 뚜껑을 열었더니 화면이 검은 채였습니다)")
             : userText)
         lines.append("")
-        lines.append("## 환경")
+        lines.append(L("## 환경"))
         lines.append("")
         lines.append("- HalfShell \(UpdateCheck.currentVersion)")
         lines.append("- \(ProcessInfo.processInfo.operatingSystemVersionString)")
         lines.append("- \(hardwareModel())")
-        lines.append("- 디스플레이: \(displaySummary())")
+        lines.append("- " + L("디스플레이: ") + displaySummary())
         lines.append("")
-        lines.append("## 최근 로그")
+        lines.append(L("## 최근 로그"))
         lines.append("")
         lines.append("```")
         lines.append(recentLog())
@@ -53,7 +57,7 @@ enum IssueReport {
     static func openIssuePage(userText: String = "") {
         var components = URLComponents(string: issueBase)!
         components.queryItems = [
-            URLQueryItem(name: "title", value: "[신고] "),
+            URLQueryItem(name: "title", value: L("[신고] ")),
             URLQueryItem(name: "body", value: compose(userText: userText)),
         ]
         guard let url = components.url else { return }
@@ -65,7 +69,7 @@ enum IssueReport {
     private static func hardwareModel() -> String {
         var size = 0
         sysctlbyname("hw.model", nil, &size, nil, 0)
-        guard size > 0 else { return "모델 확인 불가" }
+        guard size > 0 else { return L("모델 확인 불가") }
         var buffer = [CChar](repeating: 0, count: size)
         sysctlbyname("hw.model", &buffer, &size, nil, 0)
         return String(cString: buffer)
@@ -73,7 +77,7 @@ enum IssueReport {
 
     private static func displaySummary() -> String {
         let ids = DisplayInfo.activeDisplays()
-        guard !ids.isEmpty else { return "활성 없음" }
+        guard !ids.isEmpty else { return L("활성 없음") }
         return ids.sorted().map { id in
             "\(id)(\(CGDisplayPixelsWide(id))x\(CGDisplayPixelsHigh(id))"
                 + " builtin=\(CGDisplayIsBuiltin(id) != 0))"
@@ -82,7 +86,7 @@ enum IssueReport {
 
     private static func recentLog() -> String {
         guard let text = try? String(contentsOf: Log.fileURL, encoding: .utf8) else {
-            return "(로그를 읽지 못했습니다)"
+            return L("(로그를 읽지 못했습니다)")
         }
         return text.split(separator: "\n").suffix(logTailLines).joined(separator: "\n")
     }

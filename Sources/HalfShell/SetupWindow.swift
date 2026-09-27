@@ -80,8 +80,7 @@ private struct SetupView: View {
                 Text("버전 \(UpdateCheck.currentVersion)")
                     .font(.callout).foregroundStyle(.secondary)
             }
-            Text("뚜껑을 연 채로 내장 디스플레이만 끄고 외장만 사용합니다.\n"
-                + "클램쉘과 화면 구성은 같지만, 뚜껑을 닫지 않아 발열이 덜합니다.")
+            Text("뚜껑을 연 채로 내장 디스플레이만 끄고 외장만 사용합니다.\n클램쉘과 화면 구성은 같지만, 뚜껑을 닫지 않아 발열이 덜합니다.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -97,7 +96,7 @@ private struct SetupView: View {
         }
     }
 
-    private func statusRow(_ title: String, on: Bool) -> some View {
+    private func statusRow(_ title: LocalizedStringKey, on: Bool) -> some View {
         HStack(spacing: 8) {
             Image(systemName: on ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(on ? .green : .secondary)
@@ -123,15 +122,13 @@ private struct SetupView: View {
             }
             Text(controller.accessibilityTrusted
                  ? "화면이 보이지 않을 때 Command 를 4초 안에 5번 누르면 내장 화면이 켜집니다."
-                 : "손쉬운 사용 권한이 필요합니다. 화면이 검게 남았을 때 손만으로 빠져나올 수 "
-                   + "있는 유일한 방법이므로 켜두시길 권합니다.")
+                 : "손쉬운 사용 권한이 필요합니다. 화면이 검게 남았을 때 손만으로 빠져나올 수 있는 유일한 방법이므로 켜두시길 권합니다.")
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             if !controller.accessibilityTrusted {
                 Button("손쉬운 사용 설정 열기…") { controller.requestAccessibilityPermission() }
-                Text("시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용 에서 HalfShell 을 켭니다.\n"
-                    + "이름이 같은 \"시스템 설정 → 손쉬운 사용\"은 다른 곳입니다.")
+                Text("시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용 에서 HalfShell 을 켭니다.\n이름이 같은 \"시스템 설정 → 손쉬운 사용\"은 다른 곳입니다.")
                     .font(.caption).foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -157,8 +154,7 @@ private struct SetupView: View {
                     get: { Telemetry.isEnabled },
                     set: { Telemetry.isEnabled = $0; $0 ? Telemetry.start() : Telemetry.stop() }
                 ))
-                Text("화면 복구에 실패했을 때만 보냅니다. 앱 버전, macOS 버전, 기종, "
-                    + "그때의 디스플레이 구성이 담깁니다.\n로그 본문이나 신원 정보는 보내지 않습니다.")
+                Text("화면 복구에 실패했을 때만 보냅니다. 앱 버전, macOS 버전, 기종, 그때의 디스플레이 구성이 담깁니다.\n로그 본문이나 신원 정보는 보내지 않습니다.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

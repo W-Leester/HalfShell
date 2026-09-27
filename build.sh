@@ -38,6 +38,13 @@ cp "$BINARY" "$APP/Contents/MacOS/"
 cp Resources/Info.plist "$APP/Contents/"
 cp "$ICNS" "$APP/Contents/Resources/"
 
+# 지역화 파일. .lproj 폴더째로 넣어야 macOS 가 시스템 언어에 맞춰 고른다.
+# (진단 로그는 번역 대상이 아니다 — POSTMORTEM 의 사건 분석이 한글 로그 줄을
+#  그대로 인용하므로, 옮기면 진단 대조표가 어긋난다.)
+for lproj in Resources/*.lproj; do
+  [[ -d "$lproj" ]] && cp -R "$lproj" "$APP/Contents/Resources/"
+done
+
 # 서명. 가능한 한 실제 인증서를 쓴다.
 #
 # ad-hoc 서명(`-`)은 팀 ID 가 없고 재빌드할 때마다 해시가 바뀌어서, macOS 가

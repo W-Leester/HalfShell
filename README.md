@@ -164,6 +164,27 @@ DSN 은 `Resources/Info.plist` 의 `SentryDSN` 에서 읽는다. **비어 있으
 화면이 하나도 없는 순간에 무슨 일이 있었는지는 사후에 로그로만 확인할 수 있어서,
 디스플레이 재구성 이벤트와 복구 시도를 모두 남긴다.
 
+## 언어
+
+**맥의 시스템 언어를 따라갑니다.** 한국어면 한글, 그 밖에는 영어로 뜹니다.
+앱 안에 언어 설정은 두지 않았다 — macOS 표준 동작이라 사용자가 기대하는 곳
+(시스템 설정 → 일반 → 언어 및 지역)에서 이미 정할 수 있기 때문이다.
+
+바꾸지 않고 한 번 확인해 보려면:
+
+```sh
+/Applications/HalfShell.app/Contents/MacOS/HalfShell -AppleLanguages '(en)'
+```
+
+**진단 로그는 번역하지 않는다.** [POSTMORTEM.md](POSTMORTEM.md) 의 사건 분석과
+"재발 시 진단 순서"가 `[규칙2] 자가 치유` 같은 한글 로그 줄을 그대로 인용하고
+있어서, 옮기면 지금까지 쌓은 진단 대조표가 통째로 어긋난다. 로그는 개발자용
+자료이므로 사용자가 읽을 일도 드물다.
+
+번역을 고치거나 언어를 추가하려면 `Resources/<언어>.lproj/Localizable.strings`
+하나만 만들면 된다. **키가 한글 원문이라 번역이 빠진 항목은 한글로 떨어진다** —
+빈 화면이 뜨는 일은 없다.
+
 ## 지원 환경과 주의사항
 
 배포 전에 반드시 읽어야 할 부분이다.
@@ -387,6 +408,8 @@ Sources/HalfShell/
   UpdateCheck.swift         # GitHub Releases 최신 버전 조회
   UpdateMonitor.swift       # 하루 한 번 배경 확인 → 메뉴에 알림
 Resources/Info.plist        # LSUIElement (메뉴바 전용 앱), 버전, SentryDSN
+Resources/ko.lproj/         # 한국어 (키 = 한글 원문)
+Resources/en.lproj/         # 영어
 scripts/make-icon.swift     # 앱 아이콘(.icns) 생성기
 build.sh                    # 유니버설 빌드 + 아이콘 + 코드 서명
 install.sh                  # /Applications 설치
