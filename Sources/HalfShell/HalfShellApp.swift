@@ -6,18 +6,20 @@ struct HalfShellApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var controller = DisplayController.shared
     @StateObject private var updates = UpdateMonitor.shared
+    // 언어가 바뀌면 메뉴를 다시 그리기 위해 관찰한다.
+    @StateObject private var l10n = L10n.shared
 
     var body: some Scene {
         MenuBarExtra {
-            Toggle("외장 연결 시 내장 디스플레이 자동 끄기", isOn: $controller.autoMode)
+            Toggle(L("외장 연결 시 내장 디스플레이 자동 끄기"), isOn: $controller.autoMode)
                 .disabled(!controller.isUsable)
 
             Divider()
 
             if controller.builtinOff {
-                Button("내장 디스플레이 켜기") { controller.manualEnable() }
+                Button(L("내장 디스플레이 켜기")) { controller.manualEnable() }
             } else {
-                Button("내장 디스플레이 지금 끄기") { controller.manualDisable() }
+                Button(L("내장 디스플레이 지금 끄기")) { controller.manualDisable() }
                     .disabled(!controller.externalConnected || !controller.isUsable)
             }
 
@@ -25,45 +27,50 @@ struct HalfShellApp: App {
 
             // 이 앱이 아무 일도 할 수 없는 Mac 이라면 이유를 분명히 알린다.
             if !controller.hasBuiltinDisplay {
-                Text("이 Mac에는 내장 디스플레이가 없어 사용할 수 없습니다")
+                Text(L("이 Mac에는 내장 디스플레이가 없어 사용할 수 없습니다"))
             } else if !controller.skyLightAvailable {
-                Text("이 Mac에서는 SkyLight API를 사용할 수 없습니다")
+                Text(L("이 Mac에서는 SkyLight API를 사용할 수 없습니다"))
             }
             if let error = controller.lastError {
-                Text("오류: \(error)")
+                Text(L("오류: %@", error))
             }
 
             Divider()
 
             // 끌 수 없는 기능이므로 토글이 아니라 안내로 둔다.
             if controller.accessibilityTrusted {
-                Text("화면 복구: Command \(EmergencyUnlock.requiredTaps)번 연타")
+                Text(L("화면 복구: Command %lld번 연타", EmergencyUnlock.requiredTaps))
             } else {
-                Text("화면 복구 단축키 작동 안 함 — 손쉬운 사용 권한 필요")
+                Text(L("화면 복구 단축키 작동 안 함 — 손쉬운 사용 권한 필요"))
             }
 
             Divider()
 
-            Toggle("로그인 시 실행", isOn: $controller.launchAtLogin)
+            Toggle(L("로그인 시 실행"), isOn: $controller.launchAtLogin)
             if let version = updates.availableVersion {
-                Button("새 버전 \(version) 받기…") { updates.openReleasesPage() }
+                Button(L("새 버전 %@ 받기…", version)) { updates.openReleasesPage() }
             }
-            Button("HalfShell 정보 보기") { SetupWindowController.shared.show() }
+            Picker(L("언어"), selection: $l10n.language) {
+                ForEach(Language.allCases) { lang in
+                    Text(lang.displayName).tag(lang)
+                }
+            }
+
+            Button(L("HalfShell 정보 보기")) { SetupWindowController.shared.show() }
 
             Divider()
 
-            Button("종료") { NSApp.terminate(nil) }
+            Button(L("종료")) { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
         } label: {
             Image(systemName: controller.builtinOff ? "laptopcomputer.slash" : "laptopcomputer")
         }
     }
 
-    // String 을 돌려주면 Text(_: String) 이 잡혀서 번역이 되지 않는다.
-    // LocalizedStringKey 여야 Localizable.strings 를 거친다.
-    private var statusLine: LocalizedStringKey {
-        if controller.builtinOff { return "내장 디스플레이: 꺼짐" }
-        return controller.externalConnected ? "외장 디스플레이: 연결됨" : "외장 디스플레이: 없음"
+    private var statusLine: String {
+        if controller.builtinOff { return L("내장 디스플레이: 꺼짐") }
+        return controller.externalConnected
+            ? L("외장 디스플레이: 연결됨") : L("외장 디스플레이: 없음")
     }
 }
 

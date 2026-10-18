@@ -17,13 +17,15 @@ final class ReportWindowController: NSObject, NSWindowDelegate {
         if window == nil {
             let hosting = NSHostingController(rootView: ReportView())
             let w = NSWindow(contentViewController: hosting)
-            w.title = NSLocalizedString("오류 신고", comment: "신고 창 제목")
             w.styleMask = [.titled, .closable]
             w.isReleasedWhenClosed = false
             w.delegate = self
             w.center()
             window = w
         }
+        // 제목은 창을 만들 때가 아니라 열 때마다 맞춘다. 창은 한 번 만들어 재사용하므로,
+        // 생성 시점에만 넣으면 언어를 바꿔도 옛 제목이 남는다.
+        window?.title = L("오류 신고")
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
         window?.orderFrontRegardless()
@@ -35,13 +37,14 @@ final class ReportWindowController: NSObject, NSWindowDelegate {
 private struct ReportView: View {
     @State private var text = ""
     @State private var sent = false
+    @ObservedObject private var l10n = L10n.shared
 
     private var canSendInApp: Bool { Telemetry.isEnabled }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("무슨 일이 있었나요?").font(.headline)
-            Text("예: 독을 뽑고 뚜껑을 열었더니 화면이 검은 채였습니다.")
+            Text(L("무슨 일이 있었나요?")).font(.headline)
+            Text(L("예: 독을 뽑고 뚜껑을 열었더니 화면이 검은 채였습니다."))
                 .font(.caption).foregroundStyle(.secondary)
 
             TextEditor(text: $text)
@@ -49,7 +52,7 @@ private struct ReportView: View {
                 .frame(height: 120)
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.separator))
 
-            DisclosureGroup("함께 보내는 정보") {
+            DisclosureGroup(L("함께 보내는 정보")) {
                 ScrollView {
                     Text(IssueReport.diagnosticsOnly())
                         .font(.system(.caption, design: .monospaced))
@@ -60,20 +63,20 @@ private struct ReportView: View {
             }
 
             if sent {
-                Label("보냈습니다. 고맙습니다.", systemImage: "checkmark.circle.fill")
+                Label(L("보냈습니다. 고맙습니다."), systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
             } else if !canSendInApp {
                 // 자동 전송이 꺼져 있으면 앱이 대신 보낼 수 없다. 브라우저 경로로 안내한다.
-                Text("오류 보고서 자동 전송이 꺼져 있어 앱에서 바로 보낼 수 없습니다.\n브라우저로 신고하거나, HalfShell 정보 창에서 자동 전송을 켜주세요.")
+                Text(L("오류 보고서 자동 전송이 꺼져 있어 앱에서 바로 보낼 수 없습니다.\n브라우저로 신고하거나, HalfShell 정보 창에서 자동 전송을 켜주세요."))
                     .font(.caption).foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             HStack {
-                Button("브라우저로 신고") { IssueReport.openIssuePage(userText: text) }
+                Button(L("브라우저로 신고")) { IssueReport.openIssuePage(userText: text) }
                 Spacer()
-                Button("닫기") { ReportWindowController.shared.close() }
-                Button("보내기") { send() }
+                Button(L("닫기")) { ReportWindowController.shared.close() }
+                Button(L("보내기")) { send() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(!canSendInApp || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || sent)
             }

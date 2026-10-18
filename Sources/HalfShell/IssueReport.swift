@@ -10,11 +10,8 @@ import Foundation
 ///
 /// 서버가 필요 없다는 이점도 있다. GitHub 이슈 작성 화면에 제목과 본문을 미리
 /// 채워 넣는 것만으로 신고 경로가 완성된다.
+@MainActor
 enum IssueReport {
-    /// SwiftUI 바깥이라 리터럴이 자동으로 번역되지 않는다. 짧게 감싼다.
-    private static func L(_ key: String) -> String {
-        NSLocalizedString(key, comment: "오류 신고서")
-    }
     private static let issueBase = "https://github.com/W-Leester/HalfShell/issues/new"
     /// URL 길이에는 현실적인 한계가 있어 로그는 최근 것만 싣는다.
     private static let logTailLines = 40

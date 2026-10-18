@@ -46,6 +46,8 @@ final class SetupWindowController: NSObject, NSWindowDelegate {
 private struct SetupView: View {
     @ObservedObject private var controller = DisplayController.shared
     @ObservedObject private var updates = UpdateMonitor.shared
+    // 언어가 바뀌면 이 창도 다시 그려야 한다.
+    @ObservedObject private var l10n = L10n.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -53,7 +55,7 @@ private struct SetupView: View {
             Divider()
 
             if !controller.hasBuiltinDisplay {
-                Label("이 Mac에는 내장 디스플레이가 없어 사용할 수 없습니다.",
+                Label(L("이 Mac에는 내장 디스플레이가 없어 사용할 수 없습니다."),
                       systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.orange)
             } else {
@@ -77,10 +79,10 @@ private struct SetupView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("HalfShell").font(.title2).bold()
-                Text("버전 \(UpdateCheck.currentVersion)")
+                Text(L("버전 %@", UpdateCheck.currentVersion))
                     .font(.callout).foregroundStyle(.secondary)
             }
-            Text("뚜껑을 연 채로 내장 디스플레이만 끄고 외장만 사용합니다.\n클램쉘과 화면 구성은 같지만, 뚜껑을 닫지 않아 발열이 덜합니다.")
+            Text(L("뚜껑을 연 채로 내장 디스플레이만 끄고 외장만 사용합니다.\n클램쉘과 화면 구성은 같지만, 뚜껑을 닫지 않아 발열이 덜합니다."))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -89,20 +91,20 @@ private struct SetupView: View {
     /// 값 변경은 메뉴바에서 한다. 여기서는 상태만 보여준다.
     private var settingsStatus: some View {
         VStack(alignment: .leading, spacing: 8) {
-            statusRow("외장 연결 시 내장 디스플레이 자동 끄기", on: controller.autoMode)
-            statusRow("로그인 시 자동 실행", on: controller.launchAtLogin)
-            Text("변경은 메뉴바 아이콘에서 합니다.")
+            statusRow(L("외장 연결 시 내장 디스플레이 자동 끄기"), on: controller.autoMode)
+            statusRow(L("로그인 시 자동 실행"), on: controller.launchAtLogin)
+            Text(L("변경은 메뉴바 아이콘에서 합니다."))
                 .font(.caption).foregroundStyle(.tertiary)
         }
     }
 
-    private func statusRow(_ title: LocalizedStringKey, on: Bool) -> some View {
+    private func statusRow(_ title: String, on: Bool) -> some View {
         HStack(spacing: 8) {
             Image(systemName: on ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(on ? .green : .secondary)
             Text(title)
             Spacer()
-            Text(on ? "켜짐" : "꺼짐")
+            Text(on ? L("켜짐") : L("꺼짐"))
                 .font(.callout)
                 .foregroundStyle(on ? .primary : .secondary)
         }
@@ -114,21 +116,21 @@ private struct SetupView: View {
                 Image(systemName: controller.accessibilityTrusted
                       ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                     .foregroundStyle(controller.accessibilityTrusted ? .green : .orange)
-                Text("화면 복구 단축키 — Command 5번 연타").bold()
+                Text(L("화면 복구 단축키 — Command 5번 연타")).bold()
                 Spacer()
-                Text(controller.accessibilityTrusted ? "준비됨" : "작동 안 함")
+                Text(controller.accessibilityTrusted ? L("준비됨") : L("작동 안 함"))
                     .font(.callout)
                     .foregroundStyle(controller.accessibilityTrusted ? Color.primary : Color.orange)
             }
             Text(controller.accessibilityTrusted
-                 ? "화면이 보이지 않을 때 Command 를 4초 안에 5번 누르면 내장 화면이 켜집니다."
-                 : "손쉬운 사용 권한이 필요합니다. 화면이 검게 남았을 때 손만으로 빠져나올 수 있는 유일한 방법이므로 켜두시길 권합니다.")
+                 ? L("화면이 보이지 않을 때 Command 를 4초 안에 5번 누르면 내장 화면이 켜집니다.")
+                 : L("손쉬운 사용 권한이 필요합니다. 화면이 검게 남았을 때 손만으로 빠져나올 수 있는 유일한 방법이므로 켜두시길 권합니다."))
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             if !controller.accessibilityTrusted {
-                Button("손쉬운 사용 설정 열기…") { controller.requestAccessibilityPermission() }
-                Text("시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용 에서 HalfShell 을 켭니다.\n이름이 같은 \"시스템 설정 → 손쉬운 사용\"은 다른 곳입니다.")
+                Button(L("손쉬운 사용 설정 열기…")) { controller.requestAccessibilityPermission() }
+                Text(L("시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용 에서 HalfShell 을 켭니다.\n이름이 같은 \"시스템 설정 → 손쉬운 사용\"은 다른 곳입니다."))
                     .font(.caption).foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -140,9 +142,9 @@ private struct SetupView: View {
     /// 이름에 목적을 드러내야 무엇에 쓰는 것인지 알 수 있다.
     private var troubleshooting: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text("오류 신고").font(.callout).bold()
+            Text(L("오류 신고")).font(.callout).bold()
             Spacer()
-            Button("오류 신고하기") { ReportWindowController.shared.show() }
+            Button(L("오류 신고하기")) { ReportWindowController.shared.show() }
         }
     }
 
@@ -150,11 +152,11 @@ private struct SetupView: View {
     @ViewBuilder private var telemetrySection: some View {
         if Telemetry.isConfigured {
             VStack(alignment: .leading, spacing: 4) {
-                Toggle("오류 보고서 자동 전송", isOn: Binding(
+                Toggle(L("오류 보고서 자동 전송"), isOn: Binding(
                     get: { Telemetry.isEnabled },
                     set: { Telemetry.isEnabled = $0; $0 ? Telemetry.start() : Telemetry.stop() }
                 ))
-                Text("화면 복구에 실패했을 때만 보냅니다. 앱 버전, macOS 버전, 기종, 그때의 디스플레이 구성이 담깁니다.\n로그 본문이나 신원 정보는 보내지 않습니다.")
+                Text(L("화면 복구에 실패했을 때만 보냅니다. 앱 버전, macOS 버전, 기종, 그때의 디스플레이 구성이 담깁니다.\n로그 본문이나 신원 정보는 보내지 않습니다."))
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -164,13 +166,13 @@ private struct SetupView: View {
     private var footer: some View {
         HStack {
             if let version = updates.availableVersion {
-                Button("새 버전 \(version) 받기") { updates.openReleasesPage() }
+                Button(L("새 버전 %@ 받기", version)) { updates.openReleasesPage() }
             } else {
-                Text("업데이트는 하루 한 번 자동으로 확인합니다.")
+                Text(L("업데이트는 하루 한 번 자동으로 확인합니다."))
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Button("확인") { NSApp.keyWindow?.close() }
+            Button(L("확인")) { NSApp.keyWindow?.close() }
                 .keyboardShortcut(.defaultAction)
         }
     }
