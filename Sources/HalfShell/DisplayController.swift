@@ -102,6 +102,13 @@ final class DisplayController: ObservableObject {
     /// 어차피 전환의 몇 초를 덮으면 충분하므로 60초가 지나면 스스로 풀린다
     /// (진짜 잠들었다면 그 60초 동안 코드가 돌지 않으니 아무 차이가 없다).
     private var sleepBeganAt: Date?
+
+    /// 규칙 3이 끄기 전에 거치는 관문(사건 7). 목록의 외장이 진짜인지 물리 증거로 본다.
+    private var trustGate = ExternalTrustGate()
+    /// 관문 판단이 바뀔 때만 로그를 남긴다(워치독이 2초마다 돈다).
+    private var lastGateNote = ""
+    /// 깨어남 복구 재시도의 세대. 올리면 진행 중인 재시도가 멈춘다.
+    private var wakeRestoreGeneration = 0
     private static let sleepHoldDuration: TimeInterval = 60
     private var lastWakeAt = Date.distantPast
     private var pendingEvaluation: DispatchWorkItem?
@@ -246,7 +253,7 @@ final class DisplayController: ObservableObject {
     /// 그대로 두면 그만큼 잠자기 진입이 늦어진다.
     ///
     /// 그래서 최선 노력으로만 던져두고, 실제 보장은 깨어난 뒤
-    /// ``restoreBuiltinPersistently(attemptsLeft:)`` 가 맡는다(실측으로 27ms 만에 복구).
+    /// ``restoreBuiltinPersistently(attemptsLeft:generation:)`` 가 맡는다(실측으로 27ms 만에 복구).
     private func prepareForSleep() {
         sleepBeganAt = Date()
         Log.write("[시스템] 잠들기 — 내장 선복구 시도(실패해도 깨어날 때 복구한다)")
@@ -276,23 +283,54 @@ final class DisplayController: ObservableObject {
     /// 눌러주면 된다. 검은 화면으로 깨어나는 것보다는 낫다.
     private func handleWake() {
         sleepBeganAt = nil
-        Log.write("[시스템] 깨어남 — 내장 복구 후 자동 끄기 보류")
-        // 유령 판별 실험: 깨어나는 순간이 유령이 태어나는 순간이므로,
-        // 이때의 두 장부(화면 목록 vs 물리 링크)를 반드시 대조해 남긴다.
+        lastWakeAt = Date()
+        wakeRestoreGeneration += 1
+        let generation = wakeRestoreGeneration
+
         let cgExternals = DisplayInfo.activeDisplays().filter { CGDisplayIsBuiltin($0) == 0 }
-        Log.write("[진단] 깨어남 대조(즉시) — 목록외장=\(cgExternals.sorted()) "
-            + "\(PhysicalLink.describe()) 뚜껑=\(LidState.isClosed ? "닫힘" : "열림")")
-        // 깨어나는 순간의 DCP 는 아직 안 올라와 있다(실측: 0.9초 뒤 복귀). 즉시
-        // 조회만 남기면 정작 필요한 시점의 데이터가 "준비중"으로 비어 버리므로,
-        // 장부가 준비된 뒤의 값도 함께 남긴다. 관측 전용이라 동작에는 영향이 없다.
-        PhysicalLink.readWhenReady { reading in
+        let realExternals = Set(DisplayInfo.realActiveDisplays().filter { CGDisplayIsBuiltin($0) == 0 })
+        let diagnosis = "목록외장=\(cgExternals.sorted()) \(PhysicalLink.describe()) "
+            + "뚜껑=\(LidState.isClosed ? "닫힘" : "열림")"
+
+        // 깨어난 순간의 외장이 물리 링크로 뒷받침되면 진짜다 — 보류할 이유가 없다(사건 7).
+        //
+        // 사건 3 이후 깨어나면 무조건 내장을 되살리고 자동 끄기를 보류했다. 목록만으로는
+        // 유령과 진짜를 구분할 수 없었기 때문이다. 그런데 뚜껑을 열면 재구성이 먼저 오고
+        // 깨어남 알림이 뒤에 와서, 규칙 3이 이미 정확히 끈 내장을 이 보류가 0.15초 뒤
+        // 도로 켜는 일이 반복됐다(10/14 외). 한 달 실험으로 유령은 물리 링크가 0이라는
+        // 것이 확정되어, 이제 구분할 수 있다.
+        if !realExternals.isEmpty,
+           PhysicalLink.evidence(externalCount: realExternals.count) == .backed {
+            Log.write("[시스템] 깨어남 — 외장 \(realExternals.sorted()) 를 물리 링크로 확인, 보류 없이 재무장")
+            Log.write("[진단] 깨어남 대조(즉시) — \(diagnosis)")
+            autoDisableArmed = true
+            handleReconfiguration()
+            return
+        }
+
+        // 증거가 없거나 장부가 아직 안 올라왔다 — 예전처럼 안전한 쪽(복구 + 보류)으로 간다.
+        Log.write("[시스템] 깨어남 — 내장 복구 후 자동 끄기 보류")
+        Log.write("[진단] 깨어남 대조(즉시) — \(diagnosis)")
+        autoDisableArmed = false
+        // 깨어나는 순간의 DCP 는 아직 안 올라와 있는 경우가 많다(실측 0.9초 뒤 복귀).
+        // 장부가 준비된 뒤 진짜로 확인되면 그때 보류를 거둔다.
+        PhysicalLink.readWhenReady { [weak self] reading in
             let settled = DisplayInfo.activeDisplays().filter { CGDisplayIsBuiltin($0) == 0 }
             Log.write("[진단] 깨어남 대조(안정) — 목록외장=\(settled.sorted()) "
                 + "물리링크=\(reading.text) 뚜껑=\(LidState.isClosed ? "닫힘" : "열림")")
+            MainActor.assumeIsolated {
+                guard let self, self.wakeRestoreGeneration == generation, !self.autoDisableArmed else { return }
+                let externals = Set(DisplayInfo.realActiveDisplays().filter { CGDisplayIsBuiltin($0) == 0 })
+                guard !externals.isEmpty,
+                      PhysicalLink.evidence(reading, externalCount: externals.count) == .backed
+                else { return }
+                self.wakeRestoreGeneration += 1  // 진행 중인 복구 재시도를 멈춘다
+                self.autoDisableArmed = true
+                Log.write("[시스템] 깨어남 보류 해제 — 장부 준비 후 외장 \(externals.sorted()) 를 물리 링크로 확인")
+                self.handleReconfiguration()
+            }
         }
-        autoDisableArmed = false
-        lastWakeAt = Date()
-        restoreBuiltinPersistently(attemptsLeft: Self.wakeRestoreAttempts)
+        restoreBuiltinPersistently(attemptsLeft: Self.wakeRestoreAttempts, generation: generation)
         handleReconfiguration()
     }
 
@@ -303,7 +341,9 @@ final class DisplayController: ObservableObject {
     /// 방식이면 그 실패가 그대로 검은 화면이 된다 — 자동 모드가 켜져 있으면
     /// 규칙 1(외장 0개)도 규칙 2(자동 모드 꺼짐)도 발동 조건이 아니라
     /// 아무도 다시 켜주지 않기 때문이다.
-    private func restoreBuiltinPersistently(attemptsLeft: Int) {
+    private func restoreBuiltinPersistently(attemptsLeft: Int, generation: Int) {
+        // 깨어남 판단이 바뀌었다(물리 증거로 외장이 진짜로 확인됨) — 더 되살리지 않는다.
+        guard generation == wakeRestoreGeneration else { return }
         if let builtin = builtinDisplayID,
            DisplayInfo.realActiveDisplays().contains(builtin) {
             return  // 이미 켜져 있다
@@ -329,7 +369,7 @@ final class DisplayController: ObservableObject {
         enableBuiltin()
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.wakeRestoreInterval) { [weak self] in
             MainActor.assumeIsolated {
-                self?.restoreBuiltinPersistently(attemptsLeft: attemptsLeft - 1)
+                self?.restoreBuiltinPersistently(attemptsLeft: attemptsLeft - 1, generation: generation)
             }
         }
     }
@@ -399,6 +439,8 @@ final class DisplayController: ObservableObject {
         }
 
         if externals.isEmpty {
+            trustGate.reset()
+            lastGateNote = ""
             // 외장이 하나도 없는 상태를 지나갔다면, 다음에 붙는 것은 진짜 연결이다.
             if !autoDisableArmed {
                 autoDisableArmed = true
@@ -412,13 +454,38 @@ final class DisplayController: ObservableObject {
                 enableBuiltin()
             }
         } else if autoMode {
-            // 규칙 3. 단, 깨어난 직후 관찰만으로는 끄지 않는다(handleWake 참고).
-            if !isOff, autoDisableArmed { disableBuiltin() }
+            // 규칙 3. 단, 깨어난 직후 관찰만으로는 끄지 않고(handleWake 참고),
+            // 목록의 외장이 진짜인지 물리 증거로 확인한다(사건 7, ExternalTrustGate).
+            if !isOff, autoDisableArmed, externalsTrusted(externals) { disableBuiltin() }
         } else if isOff, !manuallyDisabled, !lidClosed {
             // 규칙 2: 자동 모드가 꺼져 있는데 내장이 꺼져 있다 → 자가 치유
             Log.write("[규칙2] 자동 모드 꺼짐 + 내장 꺼짐 → 자가 치유")
             enableBuiltin()
         }
+    }
+
+    /// 규칙 3이 끄기 전의 확인. ``ExternalTrustGate`` 참고.
+    ///
+    /// 9/11 에 유령 둘(진짜 신원, 물리 링크 0)을 보고 규칙 3이 유일한 화면을 껐다가
+    /// 0.4초 뒤 깨어남 복구가 되살린 적이 있다. 이 관문이 있었으면 끄지 않았다.
+    private func externalsTrusted(_ externals: Set<CGDirectDisplayID>) -> Bool {
+        let evidence = PhysicalLink.evidence(externalCount: externals.count)
+        let decision = trustGate.check(externals: externals, evidence: evidence)
+        let note: String
+        switch decision {
+        case .allow:
+            note = evidence == .unbacked
+                ? "통과 — 물리 증거 없이 \(Int(ExternalTrustGate.stableWindow))초 유지된 외장 \(externals.sorted()) (DisplayLink 등)"
+                : ""
+        case .wait:
+            note = "보류 — 외장 \(externals.sorted()) 를 물리 링크가 뒷받침하지 않음"
+                + "(\(PhysicalLink.describe())). 유령일 수 있어 아직 끄지 않는다"
+        }
+        if note != lastGateNote {
+            if !note.isEmpty { Log.write("[관문] \(note)") }
+            lastGateNote = note
+        }
+        return decision == .allow
     }
 
     // MARK: - 끄기/켜기
