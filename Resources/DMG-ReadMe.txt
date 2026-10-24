@@ -19,7 +19,10 @@ HalfShell.app 을 옆의 Applications 폴더로 드래그한 뒤 실행하세요
   ※ 이름이 같은 "시스템 설정 → 손쉬운 사용"은 다른 곳입니다.
 
 허용하면 Command 키만 4초 안에 5번 누르는 것으로 내장 화면이 켜집니다.
-권한이 없어도 자동 끄기와 자동 복구는 정상 동작합니다.
+이 권한이 없으면 HalfShell 은 내장 디스플레이를 끄지 않습니다 — 빠져나올
+방법이 준비되지 않은 채 유일한 화면을 끄지 않기 위해서입니다.
+이미 목록에 켜져 있는데도 메뉴에 경고가 남으면, − 로 지운 뒤 + 로 다시
+추가하세요.
 
 화면이 켜지지 않으면
 --------------------
@@ -70,7 +73,10 @@ This setting keeps a way out that works with the keyboard alone.
   Note: "System Settings → Accessibility" is a different place.
 
 Once allowed, tapping only the Command key 5 times within 4 seconds turns the
-built-in display back on. Automatic turn-off and recovery work without it.
+built-in display back on. Without this permission HalfShell does not turn off
+the built-in display — it won't turn off your only screen without a way back.
+If HalfShell is already on in the list but the menu still warns, remove it
+with − and add it again with +.
 
 If the screen doesn't come back
 -------------------------------

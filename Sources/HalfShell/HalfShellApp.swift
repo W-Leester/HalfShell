@@ -11,6 +11,14 @@ struct HalfShellApp: App {
 
     var body: some Scene {
         MenuBarExtra {
+            // 탈출구가 없으면 내장을 끄지 않는다(EscapePolicy). 이유를 맨 위에 보인다 —
+            // 메뉴 구석의 "작동 안 함"으로는 놓친다는 것을 10/24 에 겪었다.
+            if needsEscapePermission {
+                Text(L("화면 복구 단축키를 켜야 내장을 끌 수 있습니다"))
+                Button(L("손쉬운 사용 설정 열기…")) { controller.requestAccessibilityPermission() }
+                Divider()
+            }
+
             Toggle(L("외장 연결 시 내장 디스플레이 자동 끄기"), isOn: $controller.autoMode)
                 .disabled(!controller.isUsable)
 
@@ -20,7 +28,8 @@ struct HalfShellApp: App {
                 Button(L("내장 디스플레이 켜기")) { controller.manualEnable() }
             } else {
                 Button(L("내장 디스플레이 지금 끄기")) { controller.manualDisable() }
-                    .disabled(!controller.externalConnected || !controller.isUsable)
+                    .disabled(!controller.externalConnected || !controller.isUsable
+                              || !controller.accessibilityTrusted)
             }
 
             Text(statusLine)
@@ -40,8 +49,6 @@ struct HalfShellApp: App {
             // 끌 수 없는 기능이므로 토글이 아니라 안내로 둔다.
             if controller.accessibilityTrusted {
                 Text(L("화면 복구: Command %lld번 연타", EmergencyUnlock.requiredTaps))
-            } else {
-                Text(L("화면 복구 단축키 작동 안 함 — 손쉬운 사용 권한 필요"))
             }
 
             Divider()
@@ -63,8 +70,16 @@ struct HalfShellApp: App {
             Button(L("종료")) { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
         } label: {
-            Image(systemName: controller.builtinOff ? "laptopcomputer.slash" : "laptopcomputer")
+            // 권한이 없으면 메뉴바에서부터 다르게 보이게 한다.
+            Image(systemName: needsEscapePermission ? "exclamationmark.triangle"
+                  : controller.builtinOff ? "laptopcomputer.slash" : "laptopcomputer")
         }
+    }
+
+    /// 내장 디스플레이가 있고 앱이 동작할 수 있는 Mac 에서만 권한을 요구한다.
+    /// Mac mini 처럼 할 일이 없는 기기에서 경고를 띄울 이유는 없다.
+    private var needsEscapePermission: Bool {
+        controller.isUsable && !controller.accessibilityTrusted
     }
 
     private var statusLine: String {

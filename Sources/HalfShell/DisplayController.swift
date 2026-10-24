@@ -107,6 +107,8 @@ final class DisplayController: ObservableObject {
     private var trustGate = ExternalTrustGate()
     /// 관문 판단이 바뀔 때만 로그를 남긴다(워치독이 2초마다 돈다).
     private var lastGateNote = ""
+    /// 탈출구(화면 복구 단축키) 때문에 내장 끄기를 막고 있는가. 바뀔 때만 로그를 남긴다.
+    private var escapeBlockLogged = false
     /// 깨어남 복구 재시도의 세대. 올리면 진행 중인 재시도가 멈춘다.
     private var wakeRestoreGeneration = 0
     private static let sleepHoldDuration: TimeInterval = 60
@@ -175,6 +177,12 @@ final class DisplayController: ObservableObject {
 
     func manualDisable() {
         guard externalConnected else { return }
+        // 메뉴 버튼도 잠가 두지만, 경로가 하나 더 생겨도 여기서 막힌다.
+        guard EscapePolicy.mayTurnOff(escapeReady: accessibilityTrusted) else {
+            Log.write("[권한] 수동 끄기 거절 — 손쉬운 사용 권한 없음")
+            requestAccessibilityPermission()
+            return
+        }
         manuallyDisabled = !autoMode
         autoDisableArmed = true   // 사용자가 직접 지시했으므로 보류를 푼다
         Log.write("[조작] 수동 끄기")
@@ -229,7 +237,12 @@ final class DisplayController: ObservableObject {
     private func refreshAccessibilityStatus() {
         guard let emergencyUnlock else { return }
         let trusted = emergencyUnlock.isTrusted
-        if accessibilityTrusted != trusted { accessibilityTrusted = trusted }
+        if accessibilityTrusted != trusted {
+            accessibilityTrusted = trusted
+            // 권한이 생기면 끄기 잠금이 풀리고, 풀리면 꺼 둔 내장을 되살려야 한다.
+            // 다음 워치독까지 기다리지 않고 지금 판단한다.
+            evaluate()
+        }
         // 권한을 나중에 허용했다면 그때 모니터를 붙인다.
         if trusted, !emergencyUnlock.isRunning {
             emergencyUnlock.start()
@@ -448,6 +461,20 @@ final class DisplayController: ObservableObject {
             Log.write("[뚜껑] \(lidClosed ? "닫힘 — 내장이 꺼진 것은 정상이므로 손대지 않는다" : "열림")")
         }
 
+        // 탈출구가 준비되지 않았으면 내장을 꺼 둘 수 없다(EscapePolicy).
+        if !accessibilityTrusted, !escapeBlockLogged {
+            escapeBlockLogged = true
+            Log.write("[권한] 손쉬운 사용 권한 없음 — 화면 복구 단축키가 죽어 있어 내장을 끄지 않는다")
+        } else if accessibilityTrusted, escapeBlockLogged {
+            escapeBlockLogged = false
+            Log.write("[권한] 손쉬운 사용 권한 확인 — 내장 끄기 잠금 해제")
+        }
+        if EscapePolicy.mustRestore(escapeReady: accessibilityTrusted, builtinOff: isOff, lidClosed: lidClosed) {
+            Log.write("[권한] 탈출구 없이 꺼져 있던 내장을 켠다")
+            enableBuiltin()
+            return
+        }
+
         if externals.isEmpty {
             trustGate.reset()
             lastGateNote = ""
@@ -466,7 +493,8 @@ final class DisplayController: ObservableObject {
         } else if autoMode {
             // 규칙 3. 단, 깨어난 직후 관찰만으로는 끄지 않고(handleWake 참고),
             // 목록의 외장이 진짜인지 물리 증거로 확인한다(사건 7, ExternalTrustGate).
-            if !isOff, autoDisableArmed, externalsTrusted(externals) { disableBuiltin() }
+            if !isOff, autoDisableArmed, EscapePolicy.mayTurnOff(escapeReady: accessibilityTrusted),
+               externalsTrusted(externals) { disableBuiltin() }
         } else if isOff, !manuallyDisabled, !lidClosed {
             // 규칙 2: 자동 모드가 꺼져 있는데 내장이 꺼져 있다 → 자가 치유
             Log.write("[규칙2] 자동 모드 꺼짐 + 내장 꺼짐 → 자가 치유")

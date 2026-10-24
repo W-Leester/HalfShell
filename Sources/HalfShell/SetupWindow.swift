@@ -17,8 +17,14 @@ final class SetupWindowController: NSObject, NSWindowDelegate {
     private static let completedKey = "setupCompleted"
 
     /// 처음 실행이면 자동으로 띄운다.
+    /// 처음 실행이거나, 손쉬운 사용 권한이 없으면 띄운다.
+    /// 권한이 없으면 내장을 끄지 않으므로(EscapePolicy) 실행할 때 이유를 바로 보여 준다.
+    /// 실행할 때 한 번뿐이다 — 반복해서 띄우면 습관적으로 닫게 된다.
     func showIfNeeded() {
-        guard !UserDefaults.standard.bool(forKey: Self.completedKey) else { return }
+        let firstRun = !UserDefaults.standard.bool(forKey: Self.completedKey)
+        let controller = DisplayController.shared
+        let missingPermission = controller.isUsable && !controller.accessibilityTrusted
+        guard firstRun || missingPermission else { return }
         show()
     }
 
@@ -125,13 +131,18 @@ private struct SetupView: View {
             }
             Text(controller.accessibilityTrusted
                  ? L("화면이 보이지 않을 때 Command 를 4초 안에 5번 누르면 내장 화면이 켜집니다.")
-                 : L("손쉬운 사용 권한이 필요합니다. 화면이 검게 남았을 때 손만으로 빠져나올 수 있는 유일한 방법이므로 켜두시길 권합니다."))
+                 : L("손쉬운 사용 권한이 필요합니다. 화면이 검게 남았을 때 손만으로 빠져나올 수 있는 유일한 방법이라, 이 권한이 없으면 HalfShell 은 내장 디스플레이를 끄지 않습니다."))
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             if !controller.accessibilityTrusted {
                 Button(L("손쉬운 사용 설정 열기…")) { controller.requestAccessibilityPermission() }
                 Text(L("시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용 에서 HalfShell 을 켭니다.\n이름이 같은 \"시스템 설정 → 손쉬운 사용\"은 다른 곳입니다."))
+                    .font(.caption).foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                // 10/25: 껐다 켜기로는 안 됐다. 목록의 항목이 옛 서명에 묶여 있으면
+                // macOS 가 새 앱을 다른 앱으로 본다 — 지우고 다시 추가해야 한다.
+                Text(L("목록에서 이미 켜져 있는데도 이 표시가 남으면, HalfShell 을 − 로 지운 뒤 + 로 다시 추가하세요. 앱이 새로 서명되면 macOS 가 이전 허용을 인정하지 않습니다."))
                     .font(.caption).foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }
