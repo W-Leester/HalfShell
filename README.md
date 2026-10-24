@@ -274,6 +274,18 @@ xattr -cr /Applications/HalfShell.app
 
 ## 빌드
 
+### 시험
+
+```sh
+swift test
+```
+
+유령 판별·규칙 3의 관문·깨어남 복구 재시도의 판단 로직을 시험한다. 입력은
+**실측 사례 그대로**다(9/5·9/11·9/19·10/24 유령, 10/14·10/22 진짜 모니터 등).
+새 유령이나 새 실패가 관측되면 사례를 하나씩 더한다 — 다음 수정이 과거에 맞혔던
+판정을 깨뜨리는지 바로 드러나게 하기 위해서다.
+
+
 Xcode는 필요 없다. Command Line Tools의 Swift 툴체인만 있으면 빌드된다.
 
 ```sh
@@ -434,6 +446,7 @@ build.sh                    # 유니버설 빌드 + 아이콘 + 코드 서명
 install.sh                  # /Applications 설치
 make-dmg.sh                 # 배포용 DMG 생성
 
+Tests/HalfShellTests/       # 판단 로직 시험 (실측 사례가 입력) — swift test
 Package.resolved            # 의존성 버전 고정 — 커밋한다 (재현 가능한 빌드)
 build/                      # 빌드 산출물 (.app, .icns) — git 제외
 dist/                       # 배포용 DMG — git 제외
