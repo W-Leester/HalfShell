@@ -356,6 +356,16 @@ final class DisplayController: ObservableObject {
             Log.write("[시스템] 깨어남 복구 중단 — 뚜껑 닫힘(클램쉘). 복구할 것이 없다")
             return
         }
+        // 재무장됐고 외장이 진짜로 확인되면 규칙 3이 끌 차례다 — 다투지 않는다.
+        // 확인되지 않으면(유령일 수 있으면) 계속 지킨다. WakeRestorePolicy 참고.
+        let externals = DisplayInfo.realActiveDisplays().filter { CGDisplayIsBuiltin($0) == 0 }
+        if WakeRestorePolicy.shouldYield(
+            armed: autoDisableArmed, externalCount: externals.count,
+            evidence: PhysicalLink.evidence(externalCount: externals.count)) {
+            Log.write("[시스템] 깨어남 복구 중단 — 재무장됐고 외장 \(externals.sorted()) 가 "
+                + "물리 링크로 확인됨(규칙 3과 다투지 않는다)")
+            return
+        }
         guard attemptsLeft > 0 else {
             Log.write("[시스템] 내장 복구 재시도를 모두 소진했다")
             // 화면이 검은 채로 남았다는 뜻이다. 사용자는 이 순간 신고할 방법이 없다.
