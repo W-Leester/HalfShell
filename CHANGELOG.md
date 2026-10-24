@@ -333,6 +333,27 @@
   유령 판별 기준은 이제 유령 4 / 진짜 2, 반례 없음.
 - 판단 함수 시험 22건 통과.
 
+## 10월 24일 (2) — 공증 준비와 법적 고지
+
+- **Developer ID Application 인증서**를 Xcode 로 이 맥에서 만들었다(앱마다가 아니라
+  개발자 단위). 공증 방식 그대로 시험 서명해 Hardened Runtime·보안 타임스탬프 통과를 확인.
+- **build.sh**: Hardened Runtime 을 항상 켜고(개발 빌드도 배포판과 같은 조건),
+  Developer ID 일 때 보안 타임스탬프. 서명 후 `codesign --verify --strict`.
+- **make-dmg.sh 재작성**: 배포용은 앱 공증·스테이플 → DMG 서명·공증·스테이플 →
+  Gatekeeper 사전 검사. 인증서·자격증명이 없으면 빌드 전에 멈춘다. 시험용
+  `--no-notarize`. 결과물을 `HalfShell-<버전>.dmg` 와 고정 이름 `HalfShell.dmg` 둘로
+  — 웹사이트 다운로드 버튼이 고정 이름을 가리키기 때문.
+- **DMG 안내문 교체**: 공증 뒤에는 틀린 내용이 되는 문장("서명이 없어 차단, `xattr -cr`",
+  "업데이트하면 권한이 풀릴 수 있다")을 걷어내고 한국어·영어로 다시 썼다.
+  바로가기 이름은 `Applications` (Finder 가 바로가기 이름은 번역하지 않는다).
+- **법적 고지**: 오픈소스 라이선스 고지(HalfShell·Sentry, MIT 의 배포 조건 — 빌드 때
+  의존성 목록에서 자동 수집), 저작권 표시(`NSHumanReadableCopyright`), 정보 창에
+  개인정보 처리방침·오픈소스 라이선스 링크.
+- 공증 전 Gatekeeper 판정 `Unnotarized Developer ID` — 서명 완료, 공증만 남음.
+- Developer ID 로 서명한 첫 설치에서 **손쉬운 사용 권한이 풀렸다**(인증서가 바뀌어
+  다른 앱으로 인식 — 사건 3-B 와 같은 원리). 한 번 다시 켜면 이후 업데이트에는 유지된다.
+- 아직 공증 자격증명 등록 전이라 실제 공증은 돌리지 않았다.
+
 ---
 
 ## 배포 전 남은 일
@@ -341,9 +362,10 @@
 
 - [x] 며칠 실사용하며 안정성 확인 — 8/15 ~ 10/24, 사건 5~8 을 거치며 계속 중
 - [x] Sentry DSN 발급 후 `Resources/Info.plist` 의 `SentryDSN` 채우기
-- [x] Developer ID Application 인증서 **발급**
-- [ ] 그 인증서를 **이 맥에 설치** (10/18 기준 키체인에 없음)
-- [ ] 공증 자격증명 등록, build.sh 서명 옵션 수정(타임스탬프·Hardened Runtime), 공증
+- [x] Developer ID Application 인증서 — 10/24 이 맥에서 생성
+- [x] 서명 옵션(타임스탬프·Hardened Runtime), make-dmg 공증 단계, 라이선스 고지
+- [ ] 공증 자격증명 등록 → 첫 공증 시험
 - [ ] **공개/유료 결정** — MIT 공개는 되돌릴 수 없으므로 공개 전환보다 먼저
-- [ ] 저장소 Public 전환 (업데이트 확인과 브라우저 신고가 그때부터 동작한다)
-- [ ] GitHub Releases 에 공증된 DMG 첨부 (v1.0.0)
+- [ ] 오류 보고 기본값 결정, Sentry IP 저장 끄기
+- [ ] 웹사이트 문구 정정·릴리스 노트 갱신
+- [ ] 저장소 Public 전환 → GitHub Releases 에 공증된 DMG 두 개 첨부 (v1.0.0)

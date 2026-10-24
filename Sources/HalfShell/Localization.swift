@@ -57,6 +57,13 @@ final class L10n: ObservableObject {
         language = saved.flatMap(Language.init(rawValue:)) ?? .system
     }
 
+    /// 실제로 보이고 있는 언어의 코드("ko"/"en"). 웹 페이지를 같은 언어로 열 때 쓴다.
+    /// 시스템을 따를 때는 macOS 가 이 앱의 번역 중에서 고른 것을 그대로 쓴다.
+    var resolvedCode: String {
+        if let code = language.code { return code }
+        return Bundle.main.preferredLocalizations.first == "ko" ? "ko" : "en"
+    }
+
     /// 조회에 쓸 번역 묶음.
     ///
     /// 고른 언어의 `.lproj` 를 찾지 못하면 `Bundle.main` 으로 떨어진다 —

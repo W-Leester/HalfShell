@@ -232,7 +232,7 @@ DSN 은 `Resources/Info.plist` 의 `SentryDSN` 에서 읽는다. **비어 있으
   필요는 없다.
 - **비공개 API 를 쓴다.** macOS 메이저 업데이트 후에는 동작을 다시 확인해야 한다.
   심볼이 사라지면 기능이 비활성화될 뿐 크래시하지는 않는다.
-- **Gatekeeper 차단.** 아직 공증 전이라 다른 맥에서는 처음 실행 시 막힌다 (아래 참고).
+- **Gatekeeper.** 배포판은 Developer ID 로 서명·공증해서 경고 없이 열린다 (아래 참고).
 - **Mac App Store 에는 없다.** 비공개 API 와 샌드박스 때문에 올릴 수 없다 — 이유와
   대신 택한 배포 방식은 [DISTRIBUTION.md](DISTRIBUTION.md).
 - **손쉬운 사용 권한**은 Command 연타 화면 복구 단축키에만 필요하다. 허용하지 않아도
@@ -335,32 +335,46 @@ Xcode는 필요 없다. Command Line Tools의 Swift 툴체인만 있으면 빌�
 
 ### 배포용 DMG
 
-`./make-dmg.sh`는 `dist/HalfShell-<버전>.dmg`를 만든다. 버전은
-`Resources/Info.plist`의 `CFBundleShortVersionString`에서 읽으므로, 버전을 올리려면
-그 값만 수정하면 된다. 앱이 빌드되어 있지 않으면 `build.sh`를 먼저 호출한다.
+```sh
+./make-dmg.sh                  # 배포용 — Developer ID 서명 + 공증 + 스테이플
+./make-dmg.sh --no-notarize    # 시험용 — 공증 없이 DMG 만
+```
 
-DMG를 열면 세 가지가 보인다:
+배포용은 항상 새로 빌드한 뒤 **앱과 DMG 를 각각 공증**하고 공증 결과를 붙인다(스테이플).
+앱에도 붙여 두는 이유는, 사용자가 DMG 에서 꺼낸 앱을 오프라인에서 처음 열어도 바로
+열리게 하기 위해서다. 끝으로 받는 사람의 Mac 이 할 Gatekeeper 검사를 미리 돌려 본다.
+Developer ID 인증서나 공증 자격증명이 없으면 **빌드를 시작하기 전에** 멈춘다.
 
-| 항목 | 용도 |
+결과물은 내용이 같은 파일 두 개다.
+
+| 파일 | 쓰는 곳 |
 | --- | --- |
-| `HalfShell.app` | 드래그할 앱 |
-| `응용 프로그램` | `/Applications` 심볼릭 링크 (드래그 대상) |
-| `먼저 읽어주세요.txt` | 설치 방법과 Gatekeeper 해제 안내 |
+| `dist/HalfShell-<버전>.dmg` | GitHub Release, 웹사이트의 버전별 목록, Homebrew |
+| `dist/HalfShell.dmg` | 웹사이트 다운로드 버튼 (`releases/latest/download/HalfShell.dmg`) |
 
-USB, AirDrop, 클라우드 등 아무 방법으로나 옮겨서 열면 된다.
+DMG 를 열면 `HalfShell.app`, `Applications` 바로가기, `Read Me.txt`(한국어·영어 설치
+안내와 화면 복구 방법)가 보인다. 바로가기 이름을 영어로 둔 것은 Finder 가 바로가기
+이름을 번역하지 않기 때문이다.
 
-### Gatekeeper
+### 서명과 Gatekeeper
 
-지금 빌드는 **개발용 인증서(Apple Development)로 서명만 되어 있고 공증은 받지 않았다.**
-(8월 초에는 ad-hoc 서명이었다 — 손쉬운 사용 권한이 재빌드마다 풀려서 바꿨다, 사건 3-B.)
-그래서 다운로드하거나 AirDrop으로 받은 경우 격리(quarantine) 속성이 붙어 macOS가
-실행을 차단한다.
-위의 `xattr -cr` 한 줄로 풀거나, 앱을 우클릭 → "열기" → 대화상자에서 다시 "열기"를
-선택하면 된다. 한 번만 하면 이후로는 그냥 실행된다.
+[build.sh](build.sh) 는 키체인에 있는 인증서 중 **Developer ID → Apple Development →
+ad-hoc** 순으로 골라 서명하고, **Hardened Runtime 을 항상 켠다**(공증의 필수 조건이고,
+개발 빌드도 배포판과 같은 조건에서 돌게 하려고). Developer ID 일 때는 보안 타임스탬프도
+붙인다.
 
-경고 자체를 없애려면 Developer ID 인증서로 서명하고 `xcrun notarytool`로 공증해야
-한다 — 배포판은 이 방식으로 낸다([DISTRIBUTION.md](DISTRIBUTION.md)). 참고로 공증한
-앱은 멤버십이 만료되어도 계속 동작한다(서명 시점의 타임스탬프로 검증하므로).
+| 서명 | 받은 사람의 Mac 에서 |
+| --- | --- |
+| Developer ID + 공증 (배포판) | 경고 없이 열린다 |
+| Developer ID, 공증 전 | Gatekeeper 가 막는다 (`Unnotarized Developer ID`) |
+| Apple Development / ad-hoc | Gatekeeper 가 막는다. `xattr -cr /Applications/HalfShell.app` 또는 우클릭 → 열기 |
+
+서명 인증서가 바뀌면 macOS 는 다른 앱으로 보고 **손쉬운 사용 권한을 다시 묻는다**
+(사건 3-B 와 같은 원리). 10/24 에 Apple Development → Developer ID 로 바꿀 때 한 번
+겪었다. 그 뒤로는 같은 Developer ID 로 계속 서명하므로 업데이트해도 권한이 유지된다.
+
+공증한 앱은 개발자 멤버십이 만료되어도 계속 열린다(서명 시점의 타임스탬프로 확인하므로).
+배포 방식 전체는 [DISTRIBUTION.md](DISTRIBUTION.md).
 
 ## 기록
 
@@ -481,9 +495,10 @@ Resources/Info.plist        # LSUIElement (메뉴바 전용 앱), 버전, Sentry
 Resources/ko.lproj/         # 한국어 (키 = 한글 원문)
 Resources/en.lproj/         # 영어
 scripts/make-icon.swift     # 앱 아이콘(.icns) 생성기
-build.sh                    # 유니버설 빌드 + 아이콘 + 코드 서명
+build.sh                    # 유니버설 빌드 + 아이콘 + 라이선스 고지 + 코드 서명
 install.sh                  # /Applications 설치
-make-dmg.sh                 # 배포용 DMG 생성
+make-dmg.sh                 # 배포용 DMG — 공증·스테이플까지 (--no-notarize: 시험용)
+Resources/DMG-ReadMe.txt    # DMG 안 안내문 (한국어·영어)
 
 Tests/HalfShellTests/       # 판단 로직 시험 (실측 사례가 입력) — swift test
 DISTRIBUTION.md             # 배포 결정 기록 (App Store 불가 이유, 릴리스, 유료 전환)

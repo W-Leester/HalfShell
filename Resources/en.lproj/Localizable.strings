@@ -48,6 +48,10 @@
 "업데이트는 하루 한 번 자동으로 확인합니다." = "Updates are checked automatically once a day.";
 "확인" = "OK";
 
+/* 법적 고지 */
+"개인정보 처리방침" = "Privacy Policy";
+"오픈소스 라이선스" = "Open Source Licenses";
+
 /* 신고 창 */
 "무슨 일이 있었나요?" = "What happened?";
 "예: 독을 뽑고 뚜껑을 열었더니 화면이 검은 채였습니다." = "For example: I unplugged the dock, opened the lid, and the screen stayed black.";

@@ -79,20 +79,48 @@ macOS 메이저 업데이트 때마다 직접 확인해야 하는 것은 남는�
 | Apple Distribution | **App Store** 제출 | 쓸 수 없다 |
 | **Developer ID Application** | **App Store 밖** 배포 | **필요한 것은 이것** |
 
-### 공증 전에 고쳐야 할 것
+### 공증 준비 — 10/24 완료
 
-공증은 **보안 타임스탬프**와 **Hardened Runtime** 을 요구한다. 지금 [build.sh](build.sh) 는
-`codesign --timestamp=none` 이고 `--options runtime` 이 없어서, 그대로 제출하면
-거절된다. Developer ID 인증서를 설치한 뒤 함께 고친다. SkyLight 는 Apple 이 서명한
-시스템 프레임워크라 Hardened Runtime 을 켜도 불러올 수 있다.
+- **Developer ID Application 인증서**를 Xcode(Settings → Accounts → Manage Certificates →
+  `+`)로 이 맥에서 만들었다. 인증서는 개발자 단위라 **앱마다 따로 만들지 않는다** —
+  다른 맥 앱도 같은 인증서로 서명한다. 유효기간 5년.
+- [build.sh](build.sh) 가 **Hardened Runtime 을 항상 켜고**, Developer ID 일 때 **보안
+  타임스탬프**를 붙인다. 공증의 서명 요건 둘이다. Hardened Runtime 에서도 SkyLight 를
+  정상적으로 불러오는 것을 확인했다(`SkyLight=true`).
+- [make-dmg.sh](make-dmg.sh) 가 앱 공증·스테이플 → DMG 조립 → DMG 서명·공증·스테이플 →
+  Gatekeeper 사전 검사까지 한다. 시험용은 `--no-notarize`.
+- 공증 전 Gatekeeper 판정은 `source=Unnotarized Developer ID` 였다 — 서명은 끝났고
+  공증만 남은 상태. 공증 뒤에는 `Notarized Developer ID` 가 나와야 한다.
+
+**인증서를 바꾸면 손쉬운 사용 권한이 한 번 풀린다.** Apple Development → Developer ID 로
+바꾼 첫 설치에서 실제로 풀렸다. 그 뒤로는 같은 인증서라 업데이트해도 유지된다.
 
 공증 자격증명은 키체인에 한 번 등록해 둔다(저장소에 넣지 않는다 — `.gitignore` 가
-`AuthKey_*.p8`, `*.p12` 를 막아 둔다).
+`AuthKey_*.p8`, `*.p12` 를 막아 둔다). 먼저 account.apple.com → 로그인 및 보안 →
+**앱 암호**를 하나 만든다. 그다음:
 
 ```sh
 xcrun notarytool store-credentials "halfshell-notary" \
-  --apple-id <Apple ID> --team-id FS39W6C7X9 --password <앱 암호>
+  --apple-id <Apple ID> --team-id FS39W6C7X9
 ```
+
+암호를 물으면 **방금 만든 앱 암호**를 넣는다(Apple ID 로그인 암호가 아니다).
+
+---
+
+## 앱에 넣은 법적 고지
+
+| 항목 | 위치 | 이유 |
+| --- | --- | --- |
+| **오픈소스 라이선스 고지** | 앱 번들의 `Licenses.txt`, 정보 창 "오픈소스 라이선스" | MIT 는 배포할 때 저작권 표시와 라이선스 문구를 함께 넣을 것을 조건으로 한다. HalfShell 자신과 실행 파일에 함께 들어가는 Sentry(MIT) 둘 다. **build.sh 가 SwiftPM 의존성 목록에서 자동으로 모은다** — 의존성이 늘어도 빠지지 않는다 |
+| **저작권 표시** | Info.plist `NSHumanReadableCopyright` | Finder 의 "정보 가져오기"에 표시된다. LICENSE 표기와 같다 |
+| **개인정보 처리방침 링크** | 정보 창 "개인정보 처리방침" | 앱이 오류 보고·업데이트 확인으로 바깥과 통신하므로 앱 안에서도 찾을 수 있어야 한다. 앱에서 고른 언어의 페이지를 연다 |
+
+보증 부인은 MIT 라이선스 조항("있는 그대로")으로 충분하다. 유료로 가면 별도
+사용권 계약(EULA)이 필요하다.
+
+**아직 결정이 남은 것:** 오류 자동 보고의 기본값(지금 기본 켬 → 첫 실행 때 묻기 검토),
+Sentry 프로젝트에서 IP 저장 끄기(웹 설정 — 켜면 처리방침의 IP 문장을 지울 수 있다).
 
 ---
 
@@ -113,9 +141,10 @@ DMG 파일명, 정보 창의 표시, 업데이트 비교가 모두 여기서 나
 1. Info.plist 버전 올리기
 2. CHANGELOG 에 변경 내용 정리 — 이것이 릴리스 노트가 된다
 3. swift test                         판단 로직 시험
-4. ./make-dmg.sh                      빌드 → 서명 → 공증 → 스테이플 → DMG
+4. ./make-dmg.sh                      빌드 → 서명 → 공증 → 스테이플 → DMG 두 개
 5. git tag vX.Y.Z && git push --tags
-6. gh release create vX.Y.Z dist/HalfShell-X.Y.Z.dmg --notes-file <노트>
+6. gh release create vX.Y.Z dist/HalfShell-X.Y.Z.dmg dist/HalfShell.dmg --notes-file <노트>
+7. 웹사이트: 릴리스 노트 추가, (첫 출시면) status 를 released 로 → 푸시
 ```
 
 ### 업데이트 확인
@@ -156,7 +185,30 @@ Sparkle 은 맥 앱 자동 업데이트의 사실상 표준이다(Lunar 도 쓴�
 | **Homebrew 개인 tap** | 언제든 가능 | 심사가 없다. 다만 사용자가 tap 주소를 알아야 한다 |
 | **자체 도메인** | 선택 | 아래 |
 
-### 자체 도메인 (hastycapybara.com)
+### 웹사이트 (hastycapybara.com) — 이미 연결되어 있다
+
+사이트 저장소(`Build-my-Website`, Astro + Cloudflare Workers)에 HalfShell 페이지(한·영),
+1.0.0 릴리스 노트, 스크린샷, 개인정보 처리방침이 이미 있다. 지금은 `status: "dev"` 라
+"개발 중" 배지만 보이고 다운로드 버튼은 숨겨져 있다. 출시 절차는 사이트 저장소의
+`docs/operations.md` 에 있다.
+
+사이트가 앱 쪽에 기대하는 것:
+
+- **DMG 파일 이름 둘.** 다운로드 버튼은 고정 이름 `HalfShell.dmg` 를, 버전별 목록은
+  `HalfShell-X.Y.Z.dmg` 를 가리킨다. make-dmg.sh 가 둘 다 만든다.
+- **공개 저장소.** 다운로드도, 빌드 때 최신 버전·파일 크기를 읽는 것도 GitHub 공개
+  저장소를 전제한다. 비공개로 가면 아래 (b) 처럼 바꿔야 한다.
+
+출시 전에 사이트에서 고칠 문구(10/24 확인):
+
+| 위치 | 지금 | 실제 |
+| --- | --- | --- |
+| FAQ 손쉬운 사용 | "어떤 데이터도 Mac 밖으로 나가지 않습니다" | 오류 보고가 나간다. "키 입력은"으로 좁혀야 한다 |
+| FAQ 비정상 종료 / 동작 방식 | "앱이 죽으면 macOS 가 스스로 되돌립니다" | 실측상 믿을 수 없다. 탈출은 Command 연타·케이블·재부팅 |
+| 알아 두면 좋은 것 | "독을 먼저 꽂으면 내장이 켜진 채 남을 수 있다" | 10/18 이후 Intel·DisplayLink 에만 해당 |
+| 1.0.0 릴리스 노트 | 날짜 9/20, 언어 선택·물리 링크 개선 없음 | 실제 출시일과 내용으로 |
+
+### 자체 도메인 활용 방식
 
 Cloudflare 뒤에서 동작하고 있다. 쓰는 방법은 두 단계다.
 
@@ -204,10 +256,14 @@ Cloudflare 뒤에서 동작하고 있다. 쓰는 방법은 두 단계다.
 
 | 일 | 누가 | 상태 |
 | --- | --- | --- |
-| Developer ID Application 인증서를 **이 맥에 설치** | 개발자 | 발급은 했으나 10/18 기준 이 맥의 키체인에 없음. developer.apple.com 에서 내려받아 더블클릭, 또는 발급한 맥에서 `.p12` 로 내보내 가져오기 |
-| 공증 자격증명 등록 | 개발자 | 위 `store-credentials` |
-| build.sh 서명 옵션 수정, make-dmg.sh 에 공증·스테이플 추가 | 코드 | 인증서 설치 후 |
+| Developer ID Application 인증서 | 개발자 | ✅ 10/24 이 맥에서 생성 |
+| build.sh 서명 옵션, make-dmg.sh 공증·스테이플 | 코드 | ✅ 10/24 |
+| 오픈소스 라이선스 고지, 저작권 표시, 처리방침 링크 | 코드 | ✅ 10/24 |
+| 손쉬운 사용 권한 다시 켜기 (인증서 교체로 한 번 풀림) | 개발자 | 10/24 설치 후 |
+| **공증 자격증명 등록** (앱 암호 → `store-credentials`) | 개발자 | 남음 |
+| 첫 공증 시험 (`./make-dmg.sh`) | 코드 | 자격증명 뒤 |
 | **공개/유료 결정** | 개발자 | 저장소 공개 전에 |
-| 저장소 공개 전환 | 개발자 | 위 결정 뒤 |
-| 첫 릴리스(v1.0.0) | 코드 | 공증된 DMG 가 나온 뒤 |
-| 자체 도메인 (a) 또는 (b) | 개발자 | 선택 |
+| 오류 보고 기본값 결정, Sentry IP 저장 끄기 | 개발자 | 출시 전 |
+| 웹사이트 문구 정정·릴리스 노트 갱신 | 코드 (개발자 확인) | 출시 때 |
+| 저장소 공개 전환 → 첫 릴리스(v1.0.0) | 개발자 → 코드 | 위 결정 뒤 |
+| Homebrew 개인 tap, 릴리스 자동화 | 코드 | 첫 릴리스 뒤 |

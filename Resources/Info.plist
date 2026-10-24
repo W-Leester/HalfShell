@@ -12,6 +12,9 @@
 	     선언하므로 CFBundleLocalizations 는 두지 않는다(중복 집계된다). -->
 	<key>CFBundleDevelopmentRegion</key>
 	<string>ko</string>
+	<!-- Finder 의 "정보 가져오기"와 앱 정보에 표시된다. LICENSE 의 표기와 맞춘다. -->
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 W-Leester. MIT License.</string>
 	<key>CFBundleExecutable</key>
 	<string>HalfShell</string>
 	<key>CFBundleIconFile</key>

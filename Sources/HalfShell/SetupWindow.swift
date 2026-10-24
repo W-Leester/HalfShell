@@ -67,6 +67,7 @@ private struct SetupView: View {
             Divider()
             telemetrySection
             troubleshooting
+            legalLinks
             Divider()
             footer
         }
@@ -161,6 +162,27 @@ private struct SetupView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    /// 앱이 오류 보고와 업데이트 확인으로 바깥과 통신하므로, 앱 안에서도 처리방침을
+    /// 찾을 수 있어야 한다. 라이선스 고지는 MIT 의 배포 조건이다(HalfShell 과 Sentry).
+    private var legalLinks: some View {
+        HStack(spacing: 16) {
+            Button(L("개인정보 처리방침")) {
+                let url = URL(string: "https://hastycapybara.com/\(l10n.resolvedCode)/privacy/")!
+                NSWorkspace.shared.open(url)
+            }
+            Button(L("오픈소스 라이선스")) {
+                // 빌드할 때 번들에 넣는다(build.sh). 번들 밖에서 실행한 개발 중에는
+                // 파일이 없으므로 저장소의 LICENSE 로 대신한다.
+                let url = Bundle.main.url(forResource: "Licenses", withExtension: "txt")
+                    ?? URL(string: "https://github.com/W-Leester/HalfShell/blob/main/LICENSE")!
+                NSWorkspace.shared.open(url)
+            }
+            Spacer()
+        }
+        .buttonStyle(.link)
+        .font(.caption)
     }
 
     private var footer: some View {

@@ -38,6 +38,28 @@ cp "$BINARY" "$APP/Contents/MacOS/"
 cp Resources/Info.plist "$APP/Contents/"
 cp "$ICNS" "$APP/Contents/Resources/"
 
+# 오픈소스 라이선스 고지. MIT 는 배포할 때 저작권 표시와 라이선스 문구를 함께
+# 넣을 것을 조건으로 한다 — HalfShell 자신과, 실행 파일에 함께 들어가는 의존성
+# (지금은 Sentry) 모두. 의존성 목록은 SwiftPM 이 받아 둔 checkouts 에서 그대로
+# 모은다. 손으로 옮겨 적으면 의존성이 늘어날 때 빠뜨리기 쉽다.
+LICENSES="$APP/Contents/Resources/Licenses.txt"
+{
+  echo "HalfShell includes the following open source software."
+  echo "HalfShell 에는 다음 오픈소스 소프트웨어가 포함되어 있습니다."
+  echo
+  echo "------------------------------------------------------------"
+  echo "HalfShell"
+  echo "------------------------------------------------------------"
+  cat LICENSE
+  for lic in .build/checkouts/*/LICENSE*(N); do
+    echo
+    echo "------------------------------------------------------------"
+    echo "$(basename "$(dirname "$lic")")"
+    echo "------------------------------------------------------------"
+    cat "$lic"
+  done
+} > "$LICENSES"
+
 # 지역화 파일. .lproj 폴더째로 넣어야 macOS 가 시스템 언어에 맞춰 고른다.
 # (진단 로그는 번역 대상이 아니다 — POSTMORTEM 의 사건 분석이 한글 로그 줄을
 #  그대로 인용하므로, 옮기면 진단 대조표가 어긋난다.)
@@ -72,7 +94,20 @@ if [[ "$IDENTITY" == "-" ]]; then
 else
   echo "서명: $IDENTITY"
 fi
-codesign --force --timestamp=none --sign "$IDENTITY" "$APP"
+# Hardened Runtime 은 항상 켠다. 공증의 필수 조건이고, 개발 빌드에서도 켜 둬야
+# 배포판과 같은 조건에서 시험하게 된다. SkyLight 는 Apple 이 서명한 시스템
+# 프레임워크라 Hardened Runtime 에서도 불러올 수 있다.
+#
+# 보안 타임스탬프는 Developer ID 일 때만 붙인다. 공증의 필수 조건이지만 Apple
+# 서버에 접속해야 해서, 개발 빌드까지 붙이면 오프라인에서 빌드가 안 된다.
+SIGN_FLAGS=(--force --options runtime --sign "$IDENTITY")
+if [[ "$IDENTITY" == "Developer ID Application"* ]]; then
+  SIGN_FLAGS+=(--timestamp)
+else
+  SIGN_FLAGS+=(--timestamp=none)
+fi
+codesign "${SIGN_FLAGS[@]}" "$APP"
+codesign --verify --strict "$APP"
 
 echo "완료: $APP"
 echo "설치: ./install.sh    (또는 Finder에서 응용 프로그램으로 드래그)"
