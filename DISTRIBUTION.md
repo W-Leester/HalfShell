@@ -89,8 +89,9 @@ macOS 메이저 업데이트 때마다 직접 확인해야 하는 것은 남는�
   정상적으로 불러오는 것을 확인했다(`SkyLight=true`).
 - [make-dmg.sh](make-dmg.sh) 가 앱 공증·스테이플 → DMG 조립 → DMG 서명·공증·스테이플 →
   Gatekeeper 사전 검사까지 한다. 시험용은 `--no-notarize`.
-- 공증 전 Gatekeeper 판정은 `source=Unnotarized Developer ID` 였다 — 서명은 끝났고
-  공증만 남은 상태. 공증 뒤에는 `Notarized Developer ID` 가 나와야 한다.
+- 공증 전 Gatekeeper 판정은 `source=Unnotarized Developer ID` 였다. **10/30 첫 공증에서
+  앱·DMG 모두 통과**해 `source=Notarized Developer ID` 가 됐고, 인터넷에서 받은 것처럼
+  격리 표시를 붙인 DMG 로도 통과했다.
 
 **인증서를 바꾸면 손쉬운 사용 권한이 한 번 풀린다.** Apple Development → Developer ID 로
 바꾼 첫 설치에서 실제로 풀렸다. 그 뒤로는 같은 인증서라 업데이트해도 유지된다.
@@ -262,7 +263,7 @@ Cloudflare 뒤에서 동작하고 있다. 쓰는 방법은 두 단계다.
 | 오픈소스 라이선스 고지, 저작권 표시, 처리방침 링크 | 코드 | ✅ 10/24 |
 | 손쉬운 사용 권한 다시 켜기 (인증서 교체로 한 번 풀림) | 개발자 | 10/24 설치 후 |
 | 공증 자격증명 등록 | 개발자 | ✅ 10/25 |
-| 첫 공증 시험 (`./make-dmg.sh`) | 코드 | 자격증명 뒤 |
+| 첫 공증 시험 (`./make-dmg.sh`) | 코드 | ✅ 10/30 앱·DMG 통과 |
 | **공개/유료 결정** | 개발자 | 저장소 공개 전에 |
 | 오류 보고 기본값 결정, Sentry IP 저장 끄기 | 개발자 | 출시 전 |
 | 웹사이트 문구 정정·릴리스 노트 갱신 | 코드 (개발자 확인) | 출시 때 |

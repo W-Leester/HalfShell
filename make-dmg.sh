@@ -42,14 +42,14 @@ fi
 
 # 공증 제출 후 결과 확인. --wait 는 거절돼도 성공으로 끝날 수 있어 상태를 직접 읽는다.
 notarize() {
-  local file="$1" out status id
+  local file="$1" out result id
   echo "공증 제출: $(basename "$file") — 보통 몇 분 걸립니다"
   out=$(xcrun notarytool submit "$file" --keychain-profile "$PROFILE" --wait --output-format json)
-  status=$(printf '%s' "$out" | plutil -extract status raw -o - - 2>/dev/null || echo "?")
+  result=$(printf '%s' "$out" | plutil -extract status raw -o - - 2>/dev/null || echo "?")
   id=$(printf '%s' "$out" | plutil -extract id raw -o - - 2>/dev/null || echo "?")
-  if [[ "$status" != "Accepted" ]]; then
+  if [[ "$result" != "Accepted" ]]; then
     echo "$out" >&2
-    fail "공증 거절($status). 이유 보기: xcrun notarytool log $id --keychain-profile $PROFILE"
+    fail "공증 거절($result). 이유 보기: xcrun notarytool log $id --keychain-profile $PROFILE"
   fi
   echo "공증 통과 ($id)"
 }
