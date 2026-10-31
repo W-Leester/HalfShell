@@ -16,15 +16,15 @@ final class SetupWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     private static let completedKey = "setupCompleted"
 
-    /// 처음 실행이면 자동으로 띄운다.
-    /// 처음 실행이거나, 손쉬운 사용 권한이 없으면 띄운다.
+    /// 처음 실행이거나, 손쉬운 사용 권한이 없거나, 오류 보고 동의를 아직 받지 않았으면 띄운다.
     /// 권한이 없으면 내장을 끄지 않으므로(EscapePolicy) 실행할 때 이유를 바로 보여 준다.
+    /// 동의는 답하지 않고 창을 닫으면 다음 실행 때 다시 묻는다. 그동안은 보내지 않는다.
     /// 실행할 때 한 번뿐이다 — 반복해서 띄우면 습관적으로 닫게 된다.
     func showIfNeeded() {
         let firstRun = !UserDefaults.standard.bool(forKey: Self.completedKey)
         let controller = DisplayController.shared
         let missingPermission = controller.isUsable && !controller.accessibilityTrusted
-        guard firstRun || missingPermission else { return }
+        guard firstRun || missingPermission || Telemetry.needsConsent else { return }
         show()
     }
 
@@ -54,6 +54,9 @@ private struct SetupView: View {
     @ObservedObject private var updates = UpdateMonitor.shared
     // 언어가 바뀌면 이 창도 다시 그려야 한다.
     @ObservedObject private var l10n = L10n.shared
+    // Telemetry 는 관찰 대상이 아니라서, 답하는 순간 화면이 바뀌도록 여기에 들고 있는다.
+    @State private var telemetryAsked = !Telemetry.needsConsent
+    @State private var telemetryOn = Telemetry.isEnabled
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -160,19 +163,36 @@ private struct SetupView: View {
         }
     }
 
-    /// 남의 기기에서 나가는 자료이므로 끌 수 있어야 하고, 무엇이 나가는지 밝혀야 한다.
+    /// 남의 기기에서 나가는 자료이므로 먼저 묻고, 무엇이 나가는지 밝히고, 나중에 끌 수 있어야 한다.
+    /// 답하기 전에는 스위치 대신 질문을 보인다 — 스위치는 이미 정해진 값처럼 보인다.
     @ViewBuilder private var telemetrySection: some View {
         if Telemetry.isConfigured {
             VStack(alignment: .leading, spacing: 4) {
-                Toggle(L("오류 보고서 자동 전송"), isOn: Binding(
-                    get: { Telemetry.isEnabled },
-                    set: { Telemetry.isEnabled = $0; $0 ? Telemetry.start() : Telemetry.stop() }
-                ))
+                if telemetryAsked {
+                    Toggle(L("오류 보고서 자동 전송"), isOn: Binding(
+                        get: { telemetryOn },
+                        set: { setTelemetry($0) }
+                    ))
+                } else {
+                    HStack {
+                        Text(L("오류 보고서를 보내 주시겠어요?")).bold()
+                        Spacer()
+                        Button(L("보내지 않기")) { setTelemetry(false) }
+                        Button(L("보내기")) { setTelemetry(true) }
+                    }
+                }
                 Text(L("화면 복구에 실패했을 때만 보냅니다. 앱 버전, macOS 버전, 기종, 그때의 디스플레이 구성이 담깁니다.\n로그 본문이나 신원 정보는 보내지 않습니다."))
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    private func setTelemetry(_ on: Bool) {
+        Telemetry.isEnabled = on
+        on ? Telemetry.start() : Telemetry.stop()
+        telemetryAsked = true
+        telemetryOn = on
     }
 
     /// 앱이 오류 보고와 업데이트 확인으로 바깥과 통신하므로, 앱 안에서도 처리방침을

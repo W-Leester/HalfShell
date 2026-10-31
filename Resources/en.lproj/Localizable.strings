@@ -45,6 +45,8 @@
 "시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용 에서 HalfShell 을 켭니다.\n이름이 같은 \"시스템 설정 → 손쉬운 사용\"은 다른 곳입니다." = "Enable HalfShell in System Settings → Privacy & Security → Accessibility.\nThe similarly named \"System Settings → Accessibility\" is a different place.";
 "오류 신고" = "Report a Problem";
 "오류 신고하기" = "Report a Problem…";
+"오류 보고서를 보내 주시겠어요?" = "Send error reports?";
+"보내지 않기" = "Don't Send";
 "오류 보고서 자동 전송" = "Send error reports automatically";
 "화면 복구에 실패했을 때만 보냅니다. 앱 버전, macOS 버전, 기종, 그때의 디스플레이 구성이 담깁니다.\n로그 본문이나 신원 정보는 보내지 않습니다." = "Sent only when screen recovery fails. Includes the app version, macOS version, Mac model, and the display configuration at that moment.\nLog contents and identifying information are never sent.";
 "새 버전 %@ 받기" = "Get Version %@";

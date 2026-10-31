@@ -29,12 +29,19 @@ enum Telemetry {
         return value
     }
 
-    private static let optOutKey = "telemetryDisabled"
+    /// 남의 기기에서 나가는 자료라 **묻고 나서만** 보낸다(11/1 결정).
+    /// 값이 없으면 아직 묻지 않은 것이고, 그동안은 보내지 않는다.
+    /// 예전의 끄기 키(`telemetryDisabled`)는 읽지 않는다 — 기존 사용자에게도 한 번 묻는다.
+    private static let consentKey = "telemetryConsent"
 
-    /// 사용자가 끌 수 있어야 한다. 남의 기기에서 나가는 자료다.
     static var isEnabled: Bool {
-        get { dsn != nil && !UserDefaults.standard.bool(forKey: optOutKey) }
-        set { UserDefaults.standard.set(!newValue, forKey: optOutKey) }
+        get { dsn != nil && UserDefaults.standard.bool(forKey: consentKey) }
+        set { UserDefaults.standard.set(newValue, forKey: consentKey) }
+    }
+
+    /// 아직 답을 받지 않았다. 정보 창이 이때 질문을 띄운다.
+    static var needsConsent: Bool {
+        dsn != nil && UserDefaults.standard.object(forKey: consentKey) == nil
     }
 
     /// DSN 이 아예 없으면 사용자에게 설정 항목을 보여줄 이유도 없다.
